@@ -3,14 +3,10 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import Tickets from "./pages/Tickets";
 import Tasks from "./pages/Tasks";
-import Sprints from "./pages/Sprints";
 import Notes from "./pages/Notes";
-import Reports from "./pages/Reports";
-import Files from "./pages/Files";
 import Sheets from "./pages/Sheets";
 import Notifications from "./pages/Notifications";
 import Settings from "./pages/Settings";
@@ -25,14 +21,10 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/projects" element={<Projects />} />
+          <Route path="/" element={<Projects />} />
           <Route path="/tickets" element={<Tickets />} />
           <Route path="/tasks" element={<Tasks />} />
-          <Route path="/sprints" element={<Sprints />} />
           <Route path="/notes" element={<Notes />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/files" element={<Files />} />
           <Route path="/sheets" element={<Sheets />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/settings" element={<Settings />} />
