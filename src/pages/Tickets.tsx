@@ -1,205 +1,184 @@
 import { useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
-import { Plus, MoreHorizontal, Filter, LayoutGrid, List, Table } from "lucide-react";
+import { Plus, Pencil, Trash2, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
+import { SearchBar } from "@/components/SearchBar";
+import { PaginationControls } from "@/components/PaginationControls";
+import { CrudDialog, DeleteDialog } from "@/components/CrudDialog";
+import { FormField } from "@/components/FormField";
+import { AssigneeSelector, AssigneeBadges } from "@/components/AssigneeSelector";
+import { initialTickets, Ticket, statusColors, priorityColors, initialProjects, getProject } from "@/lib/data";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
-type Ticket = {
-  id: string;
-  title: string;
-  type: "Bug" | "Feature" | "Improvement" | "Task";
-  priority: "Low" | "Medium" | "High" | "Critical";
-  assignee: string;
-  project: string;
-  tags: string[];
-};
+const PAGE_SIZE = 8;
 
-type Column = {
-  id: string;
-  title: string;
-  color: string;
-  tickets: Ticket[];
-};
-
-const initialColumns: Column[] = [
-  {
-    id: "open",
-    title: "Open",
-    color: "hsl(217, 91%, 60%)",
-    tickets: [
-      { id: "TK-1045", title: "Fix login redirect loop on Safari", type: "Bug", priority: "Critical", assignee: "SC", project: "Mobile App v2", tags: ["auth", "ios"] },
-      { id: "TK-1046", title: "Add export to PDF feature", type: "Feature", priority: "Medium", assignee: "AK", project: "Analytics", tags: ["export"] },
-      { id: "TK-1047", title: "Update onboarding flow copy", type: "Task", priority: "Low", assignee: "LW", project: "E-Commerce", tags: ["ux"] },
-    ],
-  },
-  {
-    id: "in-progress",
-    title: "In Progress",
-    color: "hsl(38, 92%, 50%)",
-    tickets: [
-      { id: "TK-1040", title: "Implement real-time notifications", type: "Feature", priority: "High", assignee: "MJ", project: "Mobile App v2", tags: ["websocket"] },
-      { id: "TK-1041", title: "Database query optimization", type: "Improvement", priority: "High", assignee: "JP", project: "API Gateway", tags: ["perf"] },
-    ],
-  },
-  {
-    id: "review",
-    title: "Review",
-    color: "hsl(280, 67%, 60%)",
-    tickets: [
-      { id: "TK-1038", title: "Refactor auth middleware", type: "Improvement", priority: "Medium", assignee: "SC", project: "API Gateway", tags: ["security"] },
-    ],
-  },
-  {
-    id: "testing",
-    title: "Testing",
-    color: "hsl(199, 89%, 48%)",
-    tickets: [
-      { id: "TK-1035", title: "E2E tests for checkout flow", type: "Task", priority: "High", assignee: "AK", project: "E-Commerce", tags: ["qa"] },
-      { id: "TK-1036", title: "Fix cart total calculation", type: "Bug", priority: "Critical", assignee: "LW", project: "E-Commerce", tags: ["payments"] },
-    ],
-  },
-  {
-    id: "closed",
-    title: "Closed",
-    color: "hsl(142, 71%, 45%)",
-    tickets: [
-      { id: "TK-1030", title: "Setup CI/CD pipeline", type: "Task", priority: "Medium", assignee: "JP", project: "DevOps", tags: ["infra"] },
-    ],
-  },
-];
-
-const typeColor: Record<string, string> = {
-  Bug: "bg-destructive/10 text-destructive",
-  Feature: "bg-primary/10 text-primary",
-  Improvement: "bg-info/10 text-info",
-  Task: "bg-muted text-muted-foreground",
-};
-
-const priorityDot: Record<string, string> = {
-  Low: "bg-muted-foreground",
-  Medium: "bg-warning",
-  High: "bg-primary",
-  Critical: "bg-destructive",
-};
+const emptyTicket = (): Partial<Ticket> => ({
+  title: "", description: "", type: "Bug", priority: "Medium", status: "Open",
+  assignees: [], projectId: null, tags: [], dueDate: "",
+});
 
 const Tickets = () => {
-  const [columns, setColumns] = useState(initialColumns);
+  const [tickets, setTickets] = useState<Ticket[]>(initialTickets);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [projectFilter, setProjectFilter] = useState<string>("All");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Ticket | null>(null);
+  const [editData, setEditData] = useState<Partial<Ticket>>(emptyTicket());
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [tagsInput, setTagsInput] = useState("");
 
-  const onDragEnd = (result: DropResult) => {
-    const { source, destination } = result;
-    if (!destination) return;
-    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+  const filtered = tickets.filter(t => {
+    const matchSearch = t.title.toLowerCase().includes(search.toLowerCase()) || t.id.toLowerCase().includes(search.toLowerCase());
+    const matchProject = projectFilter === "All" || (projectFilter === "General" ? t.projectId === null : t.projectId === projectFilter);
+    return matchSearch && matchProject;
+  });
 
-    const newColumns = [...columns];
-    const sourceCol = newColumns.find((c) => c.id === source.droppableId)!;
-    const destCol = newColumns.find((c) => c.id === destination.droppableId)!;
-    const [moved] = sourceCol.tickets.splice(source.index, 1);
-    destCol.tickets.splice(destination.index, 0, moved);
-    setColumns(newColumns);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const openCreate = () => { setEditData(emptyTicket()); setEditingId(null); setDialogOpen(true); setTagsInput(""); };
+  const openEdit = (t: Ticket) => { setEditData({ ...t }); setEditingId(t.id); setDialogOpen(true); setTagsInput(t.tags.join(", ")); };
+
+  const handleSave = () => {
+    const tags = tagsInput.split(",").map(s => s.trim()).filter(Boolean);
+    if (editingId) {
+      setTickets(prev => prev.map(t => t.id === editingId ? { ...t, ...editData, tags } as Ticket : t));
+    } else {
+      const newT: Ticket = {
+        id: `TK-${Date.now().toString().slice(-4)}`, title: editData.title || "Untitled",
+        description: editData.description || "", type: (editData.type as any) || "Bug",
+        priority: (editData.priority as any) || "Medium", status: (editData.status as any) || "Open",
+        assignees: editData.assignees || [], projectId: editData.projectId || null,
+        tags, createdDate: "Today", dueDate: editData.dueDate || "",
+      };
+      setTickets(prev => [...prev, newT]);
+    }
+    setDialogOpen(false);
+  };
+
+  const handleDelete = () => {
+    if (deleteTarget) setTickets(prev => prev.filter(t => t.id !== deleteTarget.id));
+    setDeleteTarget(null);
+  };
+
+  const typeColor: Record<string, string> = {
+    Bug: "bg-destructive/10 text-destructive",
+    Feature: "bg-primary/10 text-primary",
+    Improvement: "bg-info/10 text-info",
+    Task: "bg-muted text-muted-foreground",
   };
 
   return (
     <AppLayout title="Tickets" subtitle="Track bugs, features, and tasks">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" className="gap-1.5 text-xs">
-            <LayoutGrid className="w-3.5 h-3.5" />
-            Board
-          </Button>
-          <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground">
-            <List className="w-3.5 h-3.5" />
-            List
-          </Button>
-          <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground">
-            <Table className="w-3.5 h-3.5" />
-            Table
-          </Button>
-          <div className="w-px h-5 bg-border mx-1" />
-          <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground">
-            <Filter className="w-3.5 h-3.5" />
-            Filter
-          </Button>
-        </div>
-        <Button size="sm" className="gap-1.5 text-xs">
-          <Plus className="w-3.5 h-3.5" />
-          New Ticket
-        </Button>
-      </div>
-
-      <DragDropContext onDragEnd={onDragEnd}>
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {columns.map((col) => (
-            <div key={col.id} className="flex-shrink-0 w-[280px]">
-              {/* Column header */}
-              <div className="flex items-center gap-2 mb-3 px-1">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: col.color }} />
-                <span className="text-xs font-semibold">{col.title}</span>
-                <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md ml-1">
-                  {col.tickets.length}
-                </span>
-              </div>
-
-              <Droppable droppableId={col.id}>
-                {(provided, snapshot) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className={cn(
-                      "space-y-2 min-h-[200px] p-1.5 rounded-lg transition-colors",
-                      snapshot.isDraggingOver && "bg-accent/50"
-                    )}
-                  >
-                    {col.tickets.map((ticket, index) => (
-                      <Draggable key={ticket.id} draggableId={ticket.id} index={index}>
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            {...provided.dragHandleProps}
-                            className={cn(
-                              "bg-card border border-border rounded-lg p-3 cursor-grab active:cursor-grabbing card-hover",
-                              snapshot.isDragging && "shadow-lg border-primary/30 rotate-1"
-                            )}
-                          >
-                            <div className="flex items-start justify-between mb-2">
-                              <span className="text-[10px] font-mono text-muted-foreground">{ticket.id}</span>
-                              <div className="flex items-center gap-1.5">
-                                <div className={cn("w-2 h-2 rounded-full", priorityDot[ticket.priority])} title={ticket.priority} />
-                                <button className="text-muted-foreground hover:text-foreground">
-                                  <MoreHorizontal className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </div>
-                            <p className="text-sm font-medium mb-2 leading-snug">{ticket.title}</p>
-                            <div className="flex items-center gap-1.5 mb-2">
-                              <Badge variant="secondary" className={cn("text-[10px] px-1.5 py-0 h-4 font-medium", typeColor[ticket.type])}>
-                                {ticket.type}
-                              </Badge>
-                            </div>
-                            <div className="flex items-center justify-between mt-2">
-                              <div className="flex flex-wrap gap-1">
-                                {ticket.tags.map((tag) => (
-                                  <span key={tag} className="text-[9px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">{tag}</span>
-                                ))}
-                              </div>
-                              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-semibold text-primary" title={ticket.assignee}>
-                                {ticket.assignee}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </Draggable>
-                    ))}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            </div>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant={projectFilter === "All" ? "secondary" : "ghost"} size="sm" className="text-xs" onClick={() => { setProjectFilter("All"); setPage(1); }}>All</Button>
+          <Button variant={projectFilter === "General" ? "secondary" : "ghost"} size="sm" className="text-xs" onClick={() => { setProjectFilter("General"); setPage(1); }}>General</Button>
+          {initialProjects.map(p => (
+            <Button key={p.id} variant={projectFilter === p.id ? "secondary" : "ghost"} size="sm" className="text-xs" onClick={() => { setProjectFilter(p.id); setPage(1); }}>{p.name}</Button>
           ))}
         </div>
-      </DragDropContext>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <SearchBar value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Search tickets..." />
+          <Button size="sm" className="gap-1.5 text-xs shrink-0" onClick={openCreate}>
+            <Plus className="w-3.5 h-3.5" /> New Ticket
+          </Button>
+        </div>
+      </div>
+
+      <div className="bg-card border border-border rounded-lg overflow-hidden animate-fade-in">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/30">
+                <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs">ID</th>
+                <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs">Title</th>
+                <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs">Project</th>
+                <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs">Type</th>
+                <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs">Priority</th>
+                <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs">Status</th>
+                <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs">Assignees</th>
+                <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs">Due</th>
+                <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs w-10"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.map((t, i) => (
+                <tr key={t.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors animate-slide-up" style={{ animationDelay: `${i * 30}ms` }}>
+                  <td className="py-3 px-4 font-mono text-xs text-muted-foreground">{t.id}</td>
+                  <td className="py-3 px-4 font-medium max-w-[250px] truncate">{t.title}</td>
+                  <td className="py-3 px-4 text-xs text-muted-foreground">{t.projectId ? getProject(t.projectId)?.name : "General"}</td>
+                  <td className="py-3 px-4"><Badge variant="secondary" className={cn("text-[10px] font-medium", typeColor[t.type])}>{t.type}</Badge></td>
+                  <td className="py-3 px-4"><span className={cn("text-xs font-semibold", priorityColors[t.priority])}>{t.priority}</span></td>
+                  <td className="py-3 px-4"><Badge variant="secondary" className={cn("text-[10px] font-medium", statusColors[t.status])}>{t.status}</Badge></td>
+                  <td className="py-3 px-4"><AssigneeBadges ids={t.assignees} /></td>
+                  <td className="py-3 px-4 text-xs text-muted-foreground">{t.dueDate}</td>
+                  <td className="py-3 px-4">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild><button className="text-muted-foreground hover:text-foreground"><MoreHorizontal className="w-4 h-4" /></button></DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openEdit(t)}><Pencil className="w-3.5 h-3.5 mr-2" />Edit</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(t)}><Trash2 className="w-3.5 h-3.5 mr-2" />Delete</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {filtered.length === 0 && <p className="text-center text-muted-foreground text-sm py-12">No tickets found.</p>}
+      <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} pageSize={PAGE_SIZE} />
+
+      <CrudDialog open={dialogOpen} onClose={() => setDialogOpen(false)} title={editingId ? "Edit Ticket" : "New Ticket"} onSave={handleSave}>
+        <FormField label="Title">
+          <input className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm" value={editData.title || ""} onChange={e => setEditData(d => ({ ...d, title: e.target.value }))} />
+        </FormField>
+        <FormField label="Description">
+          <textarea className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm" rows={2} value={editData.description || ""} onChange={e => setEditData(d => ({ ...d, description: e.target.value }))} />
+        </FormField>
+        <div className="grid grid-cols-2 gap-3">
+          <FormField label="Type">
+            <select className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm" value={editData.type || "Bug"} onChange={e => setEditData(d => ({ ...d, type: e.target.value as any }))}>
+              <option>Bug</option><option>Feature</option><option>Improvement</option><option>Task</option>
+            </select>
+          </FormField>
+          <FormField label="Priority">
+            <select className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm" value={editData.priority || "Medium"} onChange={e => setEditData(d => ({ ...d, priority: e.target.value as any }))}>
+              <option>Low</option><option>Medium</option><option>High</option><option>Critical</option>
+            </select>
+          </FormField>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <FormField label="Status">
+            <select className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm" value={editData.status || "Open"} onChange={e => setEditData(d => ({ ...d, status: e.target.value as any }))}>
+              <option>Open</option><option>In Progress</option><option>Review</option><option>Testing</option><option>Closed</option>
+            </select>
+          </FormField>
+          <FormField label="Due Date">
+            <input className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm" value={editData.dueDate || ""} onChange={e => setEditData(d => ({ ...d, dueDate: e.target.value }))} />
+          </FormField>
+        </div>
+        <FormField label="Project">
+          <select className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm" value={editData.projectId || ""} onChange={e => setEditData(d => ({ ...d, projectId: e.target.value || null }))}>
+            <option value="">General</option>
+            {initialProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </FormField>
+        <FormField label="Tags (comma-separated)">
+          <input className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm" value={tagsInput} onChange={e => setTagsInput(e.target.value)} />
+        </FormField>
+        <FormField label="Assignees">
+          <AssigneeSelector selected={editData.assignees || []} onChange={assignees => setEditData(d => ({ ...d, assignees }))} />
+        </FormField>
+      </CrudDialog>
+
+      <DeleteDialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} itemName={deleteTarget?.title || "ticket"} />
     </AppLayout>
   );
 };

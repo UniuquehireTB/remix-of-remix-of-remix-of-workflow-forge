@@ -1,13 +1,9 @@
 import { useState } from "react";
 import {
-  LayoutDashboard,
   FolderKanban,
   Bug,
   ListTodo,
-  Timer,
   FileText,
-  BarChart3,
-  FolderOpen,
   Table2,
   Bell,
   Settings,
@@ -15,7 +11,6 @@ import {
   ChevronRight,
   Rocket,
   Search,
-  Plus,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { cn } from "@/lib/utils";
@@ -24,19 +19,15 @@ const navSections = [
   {
     label: "Main",
     items: [
-      { title: "Dashboard", url: "/", icon: LayoutDashboard },
-      { title: "Projects", url: "/projects", icon: FolderKanban },
+      { title: "Projects", url: "/", icon: FolderKanban },
       { title: "Tickets", url: "/tickets", icon: Bug },
       { title: "Tasks", url: "/tasks", icon: ListTodo },
-      { title: "Sprints", url: "/sprints", icon: Timer },
     ],
   },
   {
     label: "Workspace",
     items: [
       { title: "Notes", url: "/notes", icon: FileText },
-      { title: "Reports", url: "/reports", icon: BarChart3 },
-      { title: "Files", url: "/files", icon: FolderOpen },
       { title: "Sheets", url: "/sheets", icon: Table2 },
     ],
   },
