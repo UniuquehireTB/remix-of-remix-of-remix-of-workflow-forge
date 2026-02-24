@@ -17,9 +17,25 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Health check to trigger DB sync on Vercel
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', message: 'Server is running', database: isDbInitialized ? 'initialized' : 'initializing' });
+// Health check with detailed diagnostics
+app.get('/api/health', async (req, res) => {
+    try {
+        await connectDB();
+        await sequelize.sync({ alter: true });
+        isDbInitialized = true;
+        res.json({
+            status: 'ok',
+            database: 'connected and synced',
+            url: process.env.DATABASE_URL ? 'URL detected' : 'URL missing',
+            env: process.env.NODE_ENV
+        });
+    } catch (error) {
+        res.status(500).json({
+            status: 'error',
+            message: error.message,
+            stack: process.env.NODE_ENV === 'production' ? null : error.stack
+        });
+    }
 });
 
 // Routes
