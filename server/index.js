@@ -25,7 +25,6 @@ app.get(['/api/health', '/health'], async (req, res) => {
     try {
         await connectDB();
         await sequelize.sync({ alter: true });
-        isDbInitialized = true;
         res.json({
             status: 'ok',
             database: 'connected and synced',
