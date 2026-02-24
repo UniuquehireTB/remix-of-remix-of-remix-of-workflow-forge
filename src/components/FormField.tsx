@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { LucideIcon } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface FormFieldProps {
   label: string;
@@ -20,12 +21,18 @@ export function FormField({ label, icon: Icon, error, required, children, classN
         {required && <span className="text-destructive">*</span>}
       </label>
       {children}
-      {error && (
-        <p className="text-xs text-destructive font-medium animate-fade-in flex items-center gap-1">
-          <span className="w-1 h-1 rounded-full bg-destructive" />
-          {error}
-        </p>
-      )}
+      <AnimatePresence>
+        {error && (
+          <motion.p
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            className="text-xs text-destructive/90 font-medium pl-0.5"
+          >
+            {error}
+          </motion.p>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

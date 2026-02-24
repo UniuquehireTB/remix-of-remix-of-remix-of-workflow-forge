@@ -7,6 +7,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AnimatedDropdown } from "@/components/AnimatedDropdown";
 import { useToast } from "@/hooks/use-toast";
+import { authService, notificationService } from "@/services/authService";
+import { formatDistanceToNow } from "date-fns";
 
 const navItems = [
   { title: "Projects", url: "/", icon: FolderKanban },
@@ -14,26 +16,31 @@ const navItems = [
   { title: "Notes", url: "/notes", icon: FileText },
 ];
 
-const notifications = [
-  { id: 1, title: "Ticket TK-1042 moved to Review", desc: "Sarah Chen moved the ticket", time: "2 min ago", unread: true },
-  { id: 2, title: "Sprint 14 started", desc: "Alex Kumar created a new sprint", time: "15 min ago", unread: true },
-  { id: 3, title: "New comment on TK-1040", desc: "Mike Johnson: 'The WebSocket implementation needs...'", time: "32 min ago", unread: true },
-  { id: 4, title: "Project 'Mobile App v2' updated", desc: "Lisa Wang updated project settings", time: "1h ago", unread: false },
-  { id: 5, title: "Bug BG-892 marked as Critical", desc: "Priority escalated by James Park", time: "2h ago", unread: false },
-];
+interface NotificationData {
+  id: number;
+  title: string;
+  message: string;
+  type: string;
+  targetId: number | null;
+  isRead: boolean;
+  createdAt: string;
+}
 
-const roles = ["Admin", "Manager", "Developer"];
+const roles = ["Architect", "Manager", "Technical Analyst", "Senior Developer", "Developer"];
 
 export function HeaderNav() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [signupOpen, setSignupOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationData[]>([]);
+  const [notifLoading, setNotifLoading] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   // Signup state
+  const [signupName, setSignupName] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirm, setSignupConfirm] = useState("");
@@ -57,11 +64,53 @@ export function HeaderNav() {
     setProfileOpen(false);
   }, [location.pathname]);
 
-  const unreadCount = notifications.filter(n => n.unread).length;
+  const currentUser = authService.getCurrentUser();
 
-  const handleSignup = (e: React.FormEvent) => {
+  const fetchNotifications = async () => {
+    setNotifLoading(true);
+    try {
+      const data = await notificationService.getAll();
+      setNotifications(data);
+    } catch (err) {
+      console.error("Failed to load notifications", err);
+    } finally {
+      setNotifLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchNotifications();
+      // Poll every 30 seconds
+      const interval = setInterval(fetchNotifications, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [currentUser?.id]);
+
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  const handleMarkAllRead = async () => {
+    try {
+      await notificationService.markAllRead();
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to mark all as read", variant: "destructive" });
+    }
+  };
+
+  const handleMarkAsRead = async (id: number) => {
+    try {
+      await notificationService.markRead(id);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs: Record<string, string> = {};
+    if (!signupName.trim()) errs.name = "Name is required";
     if (!signupEmail.trim()) errs.email = "Email is required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(signupEmail)) errs.email = "Enter a valid email";
     if (!signupPassword.trim()) errs.password = "Password is required";
@@ -75,12 +124,33 @@ export function HeaderNav() {
       return;
     }
     setSignupLoading(true);
-    setTimeout(() => {
+    try {
+      await authService.register({
+        username: signupName,
+        email: signupEmail,
+        password: signupPassword,
+        role: signupRole
+      });
+
       setSignupLoading(false);
       setSignupOpen(false);
-      setSignupEmail(""); setSignupPassword(""); setSignupConfirm(""); setSignupRole("");
+      setSignupName(""); setSignupEmail(""); setSignupPassword(""); setSignupConfirm(""); setSignupRole("");
       toast({ title: "🎉 User Created", description: "New user account has been created." });
-    }, 1000);
+    } catch (error: any) {
+      setSignupLoading(false);
+      toast({
+        title: "❌ Registration Failed",
+        description: error.message || "An error occurred during registration.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleLogout = () => {
+    authService.logout();
+    setProfileOpen(false);
+    navigate("/login", { replace: true });
+    toast({ title: "👋 Signed Out", description: "You have been successfully logged out." });
   };
 
   return (
@@ -145,21 +215,50 @@ export function HeaderNav() {
       <AnimatePresence>
         {notifOpen && (
           <motion.div initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed top-0 right-0 z-50 w-full max-w-md h-screen bg-card border-l border-border shadow-xl overflow-y-auto">
-            <div className="sticky top-0 bg-card/95 backdrop-blur-sm border-b border-border px-6 py-4 flex items-center justify-between">
-              <div><h2 className="text-lg font-bold">Notifications</h2><p className="text-xs text-muted-foreground">{unreadCount} unread</p></div>
+            className="fixed top-0 right-0 z-50 w-full max-w-md h-screen bg-card border-l border-border shadow-xl flex flex-col">
+            <div className="sticky top-0 bg-card/95 backdrop-blur-sm border-b border-border px-6 py-4 flex items-center justify-between shrink-0">
+              <div>
+                <h2 className="text-lg font-bold">Notifications</h2>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground">{unreadCount} unread</p>
+                  {unreadCount > 0 && (
+                    <>
+                      <span className="text-[10px] text-muted-foreground">•</span>
+                      <button onClick={handleMarkAllRead} className="text-[10px] font-bold text-primary hover:underline">Mark all as read</button>
+                    </>
+                  )}
+                </div>
+              </div>
               <button onClick={() => setNotifOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted transition-colors"><X className="w-5 h-5" /></button>
             </div>
-            <div className="p-4 space-y-2">
-              {notifications.map((n, i) => (
-                <motion.div key={n.id} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
-                  className={cn("p-4 rounded-xl border transition-all cursor-pointer hover:shadow-md", n.unread ? "bg-primary/5 border-primary/20" : "bg-card border-border hover:bg-muted/30")}>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-hide">
+              {notifications.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 text-center opacity-40">
+                  <Bell className="w-12 h-12 mb-3 text-muted-foreground" />
+                  <p className="text-sm font-bold">No notifications yet</p>
+                  <p className="text-xs">We'll notify you when something happens</p>
+                </div>
+              ) : notifications.map((n, i) => (
+                <motion.div
+                  key={n.id}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  onClick={() => !n.isRead && handleMarkAsRead(n.id)}
+                  className={cn(
+                    "p-4 rounded-xl border transition-all cursor-pointer hover:shadow-md relative group",
+                    !n.isRead ? "bg-primary/5 border-primary/20" : "bg-card border-border hover:bg-muted/30"
+                  )}
+                >
                   <div className="flex items-start gap-3">
-                    <div className={cn("w-2 h-2 rounded-full mt-2 shrink-0", n.unread ? "bg-primary" : "bg-transparent")} />
+                    <div className={cn("w-2 h-2 rounded-full mt-2 shrink-0 transition-colors", !n.isRead ? "bg-primary" : "bg-transparent")} />
                     <div className="flex-1 min-w-0">
-                      <p className={cn("text-sm", n.unread && "font-semibold")}>{n.title}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{n.desc}</p>
-                      <p className="text-xs text-muted-foreground/60 mt-1">{n.time}</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className={cn("text-xs font-black uppercase tracking-widest", !n.isRead ? "text-primary" : "text-muted-foreground")}>{n.type}</p>
+                        <p className="text-[10px] text-muted-foreground/60 font-medium">{formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}</p>
+                      </div>
+                      <p className={cn("text-sm mt-1 leading-tight", !n.isRead ? "font-bold text-foreground" : "font-medium text-muted-foreground")}>{n.title}</p>
+                      <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{n.message}</p>
                     </div>
                   </div>
                 </motion.div>
@@ -182,15 +281,19 @@ export function HeaderNav() {
               <div className="flex flex-col items-center gap-3">
                 <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center text-primary"><User className="w-10 h-10" /></div>
                 <div className="text-center">
-                  <h3 className="font-bold text-lg">John Doe</h3>
-                  <p className="text-sm text-muted-foreground">john.doe@company.com</p>
-                  <p className="text-xs text-muted-foreground mt-1">Product Manager</p>
+                  <h3 className="font-bold text-lg">{currentUser?.username || "User Account"}</h3>
+                  <p className="text-sm text-muted-foreground">{currentUser?.email || "No email provided"}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{currentUser?.role || "Team Member"}</p>
                 </div>
               </div>
               <div className="h-px bg-border" />
 
               {/* Add User button */}
-              <button onClick={() => { setProfileOpen(false); setSignupOpen(true); }}
+              <button onClick={() => {
+                setProfileOpen(false);
+                setSignupOpen(true);
+                setSignupErrors({});
+              }}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-primary/10 text-primary font-semibold text-sm hover:bg-primary/20 transition-all">
                 <UserPlus className="w-4 h-4" /> Add User
               </button>
@@ -209,7 +312,7 @@ export function HeaderNav() {
                 </div>
               </div>
               <div className="h-px bg-border" />
-              <button onClick={() => { setProfileOpen(false); navigate("/login"); }}
+              <button onClick={handleLogout}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-destructive/10 text-destructive font-semibold text-sm hover:bg-destructive/20 transition-all">
                 <LogOut className="w-4 h-4" /> Sign Out
               </button>
@@ -220,70 +323,89 @@ export function HeaderNav() {
 
       {/* Signup Dialog */}
       <Dialog open={signupOpen} onOpenChange={setSignupOpen}>
-        <DialogContent className="max-w-md rounded-2xl border-2 p-0 flex flex-col max-h-[85vh]">
-          <DialogHeader className="px-6 pt-5 pb-3 border-b border-border shrink-0">
-            <DialogTitle className="text-lg font-bold capitalize flex items-center gap-2">
-              <UserPlus className="w-5 h-5 text-primary" /> Create User Account
-            </DialogTitle>
+        <DialogContent className="max-w-2xl rounded-2xl border-2 p-0 flex flex-col max-h-[90vh] [&>button:last-child]:top-7 [&>button:last-child]:right-6">
+          <DialogHeader className="px-6 py-5 border-b border-border shrink-0">
+            <div className="flex items-center gap-4 text-left">
+              <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                <UserPlus className="w-5 h-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-bold capitalize leading-none mb-1.5">Create User Account</DialogTitle>
+                <p className="text-[13px] text-muted-foreground font-medium">Add a new member to your workspace</p>
+              </div>
+            </div>
           </DialogHeader>
-          <form onSubmit={handleSignup} className="px-6 py-4 space-y-4 overflow-y-auto flex-1">
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-foreground/80 capitalize">Email Address</label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input type="email" value={signupEmail} onChange={e => { setSignupEmail(e.target.value); setSignupErrors(p => ({ ...p, email: "" })); }}
-                  placeholder="user@company.com"
-                  className={cn("premium-input pl-10", signupErrors.email && "border-destructive focus:ring-destructive/20 focus:border-destructive")} />
+          <form onSubmit={handleSignup} className="flex-1 flex flex-col min-h-0">
+            <div className="flex-1 px-6 py-6 space-y-6 overflow-y-auto scrollbar-hide">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-foreground/80 capitalize">Full Name</label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input value={signupName} onChange={e => { setSignupName(e.target.value); setSignupErrors(p => ({ ...p, name: "" })); }}
+                      placeholder="Enter full name"
+                      className={cn("premium-input !pl-12", signupErrors.name && "!border-destructive focus:ring-destructive/20")} />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-foreground/80 capitalize">Email Address</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input type="email" value={signupEmail} onChange={e => { setSignupEmail(e.target.value); setSignupErrors(p => ({ ...p, email: "" })); }}
+                      placeholder="user@company.com"
+                      className={cn("premium-input !pl-12", signupErrors.email && "!border-destructive focus:ring-destructive/20")} />
+                  </div>
+                </div>
               </div>
-              {signupErrors.email && <p className="text-xs text-destructive font-medium flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-destructive" />{signupErrors.email}</p>}
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-foreground/80 capitalize flex items-center gap-1.5"><Shield className="w-3.5 h-3.5 text-primary" />Assign Role</label>
+                <AnimatedDropdown
+                  options={roles.map(r => ({ label: r, value: r }))}
+                  value={signupRole}
+                  onChange={v => { setSignupRole(v); setSignupErrors(p => ({ ...p, role: "" })); }}
+                  placeholder="Select a professional role"
+                  error={!!signupErrors.role}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-foreground/80 capitalize">Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input type={showPass ? "text" : "password"} value={signupPassword} onChange={e => { setSignupPassword(e.target.value); setSignupErrors(p => ({ ...p, password: "" })); }}
+                      placeholder="Min 6 characters"
+                      className={cn("premium-input !pl-12 pr-10", signupErrors.password && "!border-destructive focus:ring-destructive/20")} />
+                    <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-foreground/80 capitalize">Confirm Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input type={showConf ? "text" : "password"} value={signupConfirm} onChange={e => { setSignupConfirm(e.target.value); setSignupErrors(p => ({ ...p, confirm: "" })); }}
+                      placeholder="Re-enter password"
+                      className={cn("premium-input !pl-12 pr-10", signupErrors.confirm && "!border-destructive focus:ring-destructive/20")} />
+                    <button type="button" onClick={() => setShowConf(!showConf)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      {showConf ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-foreground/80 capitalize">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input type={showPass ? "text" : "password"} value={signupPassword} onChange={e => { setSignupPassword(e.target.value); setSignupErrors(p => ({ ...p, password: "" })); }}
-                  placeholder="Min 6 characters"
-                  className={cn("premium-input pl-10 pr-10", signupErrors.password && "border-destructive focus:ring-destructive/20 focus:border-destructive")} />
-                <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                  {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-              {signupErrors.password && <p className="text-xs text-destructive font-medium flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-destructive" />{signupErrors.password}</p>}
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-foreground/80 capitalize">Confirm Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input type={showConf ? "text" : "password"} value={signupConfirm} onChange={e => { setSignupConfirm(e.target.value); setSignupErrors(p => ({ ...p, confirm: "" })); }}
-                  placeholder="Re-enter password"
-                  className={cn("premium-input pl-10 pr-10", signupErrors.confirm && "border-destructive focus:ring-destructive/20 focus:border-destructive")} />
-                <button type="button" onClick={() => setShowConf(!showConf)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                  {showConf ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-              {signupErrors.confirm && <p className="text-xs text-destructive font-medium flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-destructive" />{signupErrors.confirm}</p>}
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-foreground/80 capitalize flex items-center gap-1.5"><Shield className="w-3.5 h-3.5 text-primary" />Role</label>
-              <AnimatedDropdown
-                options={roles.map(r => ({ label: r, value: r }))}
-                value={signupRole}
-                onChange={v => { setSignupRole(v); setSignupErrors(p => ({ ...p, role: "" })); }}
-                placeholder="Select a role"
-                error={!!signupErrors.role}
-              />
-              {signupErrors.role && <p className="text-xs text-destructive font-medium flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-destructive" />{signupErrors.role}</p>}
+            <div className="px-6 py-4 border-t border-border bg-muted/30 flex justify-end shrink-0">
+              <button type="submit" disabled={signupLoading}
+                className="w-full sm:w-auto px-8 py-2.5 bg-primary text-primary-foreground font-bold text-sm rounded-xl shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60">
+                {signupLoading ? <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> : <>Create User Account <ArrowRight className="w-4 h-4" /></>}
+              </button>
             </div>
           </form>
-          <div className="px-6 py-4 border-t border-border shrink-0 bg-muted/30">
-            <button type="button" onClick={handleSignup} disabled={signupLoading}
-              className="w-full py-2.5 bg-primary text-primary-foreground font-bold text-sm rounded-xl shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60">
-              {signupLoading ? <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> : <>Create Account <ArrowRight className="w-4 h-4" /></>}
-            </button>
-          </div>
         </DialogContent>
       </Dialog>
     </>

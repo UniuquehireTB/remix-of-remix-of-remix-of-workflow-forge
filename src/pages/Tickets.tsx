@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { Plus, Pencil, Trash2, MoreHorizontal, Bug, AlertCircle, Calendar, FileText, Users, ArrowRight, MessageSquare, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,25 +8,41 @@ import { SearchBar } from "@/components/SearchBar";
 import { PaginationControls } from "@/components/PaginationControls";
 import { CrudDialog, DeleteDialog } from "@/components/CrudDialog";
 import { FormField } from "@/components/FormField";
-import { AssigneeSelector, AssigneeBadges } from "@/components/AssigneeSelector";
+import { MemberSelector } from "@/components/MemberSelector";
 import { FilterDropdown } from "@/components/AnimatedDropdown";
 import { AnimatedDropdown } from "@/components/AnimatedDropdown";
 import { AnimatedDatePicker } from "@/components/AnimatedDatePicker";
-import { initialTickets, Ticket, TicketStatus, statusColors, priorityColors, initialProjects, getProject } from "@/lib/data";
+import { statusColors, priorityColors } from "@/lib/data";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { ProjectTabs } from "@/components/ProjectTabs";
+import { ticketService, projectService } from "@/services/authService";
 
-const PAGE_SIZE = 8;
-const allStatuses: TicketStatus[] = ["Open", "In Progress", "Review", "Testing", "Closed"];
+const PAGE_SIZE = 10;
+const allStatuses = ["Open", "In Progress", "Closed"];
 const allTypes = ["Bug", "Feature", "Improvement", "Task"];
 const allPriorities = ["Low", "Medium", "High", "Critical"];
 
-const emptyTicket = (): Partial<Ticket & { remarks?: string; startDate?: string; endDate?: string }> => ({
-  title: "", description: "", type: "Bug", priority: "Medium", status: "Open",
-  assignees: [], projectId: null, tags: [], dueDate: "", startDate: "", endDate: "",
+interface Ticket {
+  id: number;
+  ticketId: string;
+  title: string;
+  description: string;
+  type: string;
+  priority: string;
+  status: string;
+  projectId: number | null;
+  dueDate: string;
+  remarks: string;
+  assignees: any[];
+}
+
+const emptyTicket = (): Partial<Ticket> => ({
+  title: "", description: "", type: "Bug", priority: "Medium",
+  projectId: null, dueDate: "", assignees: []
 });
 
 const typeIcons: Record<string, string> = {
@@ -34,90 +50,148 @@ const typeIcons: Record<string, string> = {
 };
 
 const Tickets = () => {
-  const [tickets, setTickets] = useState<(Ticket & { remarks?: string; startDate?: string; endDate?: string })[]>(
-    initialTickets.map(t => ({ ...t, remarks: "", startDate: "", endDate: "" }))
-  );
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [typeFilter, setTypeFilter] = useState<string>("All");
-  const [priorityFilter, setPriorityFilter] = useState<string>("All");
-  const [statusFilter, setStatusFilter] = useState<string>("All");
-  const [projectFilter, setProjectFilter] = useState<string>("All");
+  const [pagination, setPagination] = useState({ totalItems: 0, itemsLeft: 0, totalPages: 1 });
+  const [loading, setLoading] = useState(true);
+
+  const [typeFilter, setTypeFilter] = useState("All");
+  const [priorityFilter, setPriorityFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [projectFilter, setProjectFilter] = useState<any>("All");
+
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<(Ticket & { remarks?: string }) | null>(null);
-  const [editData, setEditData] = useState<Partial<Ticket & { remarks?: string; startDate?: string; endDate?: string }>>(emptyTicket());
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Ticket | null>(null);
+  const [editData, setEditData] = useState<Partial<Ticket>>(emptyTicket());
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [remarkTarget, setRemarkTarget] = useState<string | null>(null);
+  const [remarkTarget, setRemarkTarget] = useState<number | null>(null);
   const [remarkText, setRemarkText] = useState("");
-  const [descriptionTarget, setDescriptionTarget] = useState<(Ticket & { remarks?: string }) | null>(null);
+  const [descriptionTarget, setDescriptionTarget] = useState<Ticket | null>(null);
   const { toast } = useToast();
 
-  const filtered = tickets.filter(t => {
-    const matchSearch = t.title.toLowerCase().includes(search.toLowerCase()) || t.id.toLowerCase().includes(search.toLowerCase());
-    const matchType = typeFilter === "All" || t.type === typeFilter;
-    const matchPriority = priorityFilter === "All" || t.priority === priorityFilter;
-    const matchStatus = statusFilter === "All" || t.status === statusFilter;
-    const matchProject = projectFilter === "All" || (projectFilter === "General" ? !t.projectId : t.projectId === projectFilter);
-    return matchSearch && matchType && matchPriority && matchStatus && matchProject;
-  });
+  const fetchTickets = async () => {
+    setLoading(true);
+    try {
+      const response = await ticketService.getAll({
+        search,
+        type: typeFilter === "All" ? "" : typeFilter,
+        priority: priorityFilter === "All" ? "" : priorityFilter,
+        status: statusFilter === "All" ? "" : statusFilter,
+        projectId: projectFilter === "All" ? undefined : (projectFilter === "General" ? "null" : projectFilter),
+        page,
+        limit: PAGE_SIZE
+      });
+      setTickets(response.data);
+      setPagination(response.pagination);
+    } catch (err) {
+      toast({ title: "❌ Error", description: "Failed to load tickets", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const fetchProjects = async () => {
+    try {
+      const response = await projectService.getAll({ limit: 100 });
+      setProjects(response.data);
+    } catch (err) {
+      console.error("Failed to load projects", err);
+    }
+  };
 
-  const openCreate = () => { setEditData(emptyTicket()); setEditingId(null); setErrors({}); setDialogOpen(true); };
-  const openEdit = (t: Ticket) => { setEditData({ ...t }); setEditingId(t.id); setErrors({}); setDialogOpen(true); };
+  useEffect(() => {
+    fetchTickets();
+  }, [search, page, typeFilter, priorityFilter, statusFilter, projectFilter]);
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  const openCreate = () => {
+    setEditData({
+      ...emptyTicket(),
+      projectId: (projectFilter === "All" || projectFilter === "General") ? null : projectFilter
+    });
+    setEditingId(null);
+    setErrors({});
+    setDialogOpen(true);
+  };
+
+  const openEdit = (t: Ticket) => {
+    setEditData({
+      ...t,
+      assignees: t.assignees?.map(a => a.id)
+    });
+    setEditingId(t.id);
+    setErrors({});
+    setDialogOpen(true);
+  };
 
   const validate = () => {
     const e: Record<string, string> = {};
     if (!editData.title?.trim()) e.title = "Title is required";
     if (!editData.description?.trim()) e.description = "Description is required";
-    if (!editData.startDate?.trim()) e.startDate = "Start date is required";
-    if (!editData.endDate?.trim()) e.endDate = "End date is required";
     setErrors(e);
-    if (Object.keys(e).length > 0) {
-      toast({ title: "⚠️ Validation Error", description: Object.values(e).join(" • "), variant: "destructive" });
-    }
     return Object.keys(e).length === 0;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!validate()) return;
-    if (editingId) {
-      setTickets(prev => prev.map(t => t.id === editingId ? { ...t, ...editData, dueDate: editData.endDate || editData.dueDate || "" } as any : t));
-      toast({ title: "✅ Ticket Updated", description: `${editData.title} has been updated.` });
-    } else {
-      const newT = {
-        id: `TK-${Date.now().toString().slice(-4)}`, title: editData.title || "Untitled",
-        description: editData.description || "", type: (editData.type as any) || "Bug",
-        priority: (editData.priority as any) || "Medium", status: (editData.status as any) || "Open",
-        assignees: editData.assignees || [], projectId: editData.projectId || null,
-        tags: [], createdDate: "Today", dueDate: editData.endDate || "", remarks: "",
-        startDate: editData.startDate || "", endDate: editData.endDate || "",
+    try {
+      const payload = {
+        ...editData,
+        assignees: editData.assignees?.map(a => typeof a === 'object' ? a.id : a)
       };
-      setTickets(prev => [...prev, newT]);
-      toast({ title: "🎉 Ticket Created", description: `${newT.title} has been created.` });
+
+      if (editingId) {
+        await ticketService.update(editingId, payload);
+        toast({ title: "✅ Ticket Updated", description: `${editData.title} has been updated.` });
+      } else {
+        await ticketService.create(payload);
+        toast({ title: "🎉 Ticket Raised", description: `${editData.title} has been created.` });
+      }
+      fetchTickets();
+      setDialogOpen(false);
+    } catch (err) {
+      toast({ title: "❌ Error", description: "Failed to save ticket", variant: "destructive" });
     }
-    setDialogOpen(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deleteTarget) {
-      setTickets(prev => prev.filter(t => t.id !== deleteTarget.id));
-      toast({ title: "🗑️ Ticket Deleted", variant: "destructive" });
+      try {
+        await ticketService.delete(deleteTarget.id);
+        toast({ title: "🗑️ Ticket Deleted", variant: "destructive" });
+        fetchTickets();
+      } catch (err) {
+        toast({ title: "❌ Error", description: "Failed to delete ticket", variant: "destructive" });
+      }
     }
     setDeleteTarget(null);
   };
 
-  const changeStatus = (ticketId: string, newStatus: TicketStatus) => {
-    setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: newStatus } : t));
-    toast({ title: "Status Changed", description: `Ticket moved to ${newStatus}` });
+  const changeStatus = async (ticketId: number, newStatus: string) => {
+    try {
+      await ticketService.updateStatus(ticketId, newStatus);
+      setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: newStatus } : t));
+      toast({ title: "Status Changed", description: `Ticket moved to ${newStatus}` });
+    } catch (err) {
+      toast({ title: "❌ Error", description: "Failed to update status", variant: "destructive" });
+    }
   };
 
-  const saveRemark = () => {
+  const saveRemark = async () => {
     if (remarkTarget) {
-      setTickets(prev => prev.map(t => t.id === remarkTarget ? { ...t, remarks: remarkText } : t));
-      toast({ title: "✅ Remark Saved" });
+      try {
+        await ticketService.updateRemarks(remarkTarget, remarkText);
+        setTickets(prev => prev.map(t => t.id === remarkTarget ? { ...t, remarks: remarkText } : t));
+        toast({ title: "✅ Remark Saved" });
+      } catch (err) {
+        toast({ title: "❌ Error", description: "Failed to save remark", variant: "destructive" });
+      }
     }
     setRemarkTarget(null);
     setRemarkText("");
@@ -130,43 +204,30 @@ const Tickets = () => {
     Task: "bg-muted text-muted-foreground border-border",
   };
 
-  const projectOptions = [
-    { label: "General", value: "General" },
-    ...initialProjects.map(p => ({ label: p.name, value: p.id }))
-  ];
-
   return (
     <AppLayout title="Tickets" subtitle="Track bugs, features, and improvements">
+      <ProjectTabs
+        projects={projects}
+        activeProjectId={projectFilter}
+        onChange={v => { setProjectFilter(v); setPage(1); }}
+      />
+
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
         <div className="flex items-center gap-2 flex-wrap">
           <FilterDropdown options={allTypes} value={typeFilter} onChange={v => { setTypeFilter(v); setPage(1); }} allLabel="All Types" />
           <FilterDropdown options={allPriorities} value={priorityFilter} onChange={v => { setPriorityFilter(v); setPage(1); }} allLabel="All Priorities" />
           <FilterDropdown options={allStatuses} value={statusFilter} onChange={v => { setStatusFilter(v); setPage(1); }} allLabel="All Statuses" />
-          <FilterDropdown
-            options={["General", ...initialProjects.map(p => p.name)]}
-            value={projectFilter === "All" ? "All" : projectFilter === "General" ? "General" : (initialProjects.find(p => p.id === projectFilter)?.name || projectFilter)}
-            onChange={v => {
-              if (v === "All") setProjectFilter("All");
-              else if (v === "General") setProjectFilter("General");
-              else {
-                const proj = initialProjects.find(p => p.name === v);
-                setProjectFilter(proj ? proj.id : v);
-              }
-              setPage(1);
-            }}
-            allLabel="All Projects"
-          />
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <SearchBar value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Search tickets..." />
           <Button onClick={openCreate} className="gap-2 rounded-xl shadow-lg shadow-primary/25 px-5 shrink-0">
             <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">New Ticket</span>
+            <span>Rise Ticket</span>
           </Button>
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table Content */}
       <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm animate-fade-in">
         <div className="overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: "none" }}>
           <table className="w-full text-sm min-w-[1100px]">
@@ -178,87 +239,111 @@ const Tickets = () => {
               </tr>
             </thead>
             <tbody>
-              {paginated.map((t, i) => (
-                <motion.tr
-                  key={t.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: i * 0.03 }}
-                  className="border-t border-border/50 hover:bg-primary/[0.02] transition-colors cursor-pointer"
-                  onClick={() => setDescriptionTarget(t)}
-                >
-                  <td className="py-3.5 px-4 font-mono text-xs text-primary font-bold whitespace-nowrap">{t.id}</td>
-                  <td className="py-3.5 px-4 font-semibold max-w-[180px]">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="truncate block">{t.title}</span>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-xs">{t.title}</TooltipContent>
-                    </Tooltip>
-                  </td>
-                  <td className="py-3.5 px-4 max-w-[150px]">
-                    <span className="text-xs text-muted-foreground truncate block">{t.description?.slice(0, 40)}{(t.description?.length || 0) > 40 ? "..." : ""}</span>
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <Badge variant="outline" className={cn("text-[10px] font-bold px-2 py-0.5 rounded-md border whitespace-nowrap", typeColor[t.type])}>
-                      {typeIcons[t.type]} {t.type}
-                    </Badge>
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <span className={cn("text-xs font-bold flex items-center gap-1 whitespace-nowrap", priorityColors[t.priority])}>
-                      <span className={cn("w-2 h-2 rounded-full", t.priority === "Critical" ? "bg-destructive" : t.priority === "High" ? "bg-primary" : t.priority === "Medium" ? "bg-warning" : "bg-muted-foreground")} />
-                      {t.priority}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4" onClick={e => e.stopPropagation()}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button className={cn("text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all hover:ring-2 hover:ring-primary/20 whitespace-nowrap", statusColors[t.status])}>
-                          {t.status}
-                          <ArrowRight className="w-3 h-3 opacity-50" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="rounded-xl min-w-[160px] bg-popover border border-border shadow-xl z-50">
-                        <DropdownMenuLabel className="text-[10px] tracking-wider capitalize">Change Status</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        {allStatuses.map(s => (
-                          <DropdownMenuItem key={s} onClick={() => changeStatus(t.id, s)} className={cn("text-xs font-medium", t.status === s && "bg-primary/10 text-primary")}>
-                            {s} {t.status === s && <span className="ml-auto text-[10px]">✓</span>}
-                          </DropdownMenuItem>
+              {loading ? (
+                Array(5).fill(0).map((_, idx) => (
+                  <tr key={idx} className="border-t border-border/50 animate-pulse">
+                    {Array(10).fill(0).map((__, tdIdx) => (
+                      <td key={tdIdx} className="p-4"><div className="h-4 bg-muted rounded w-full" /></td>
+                    ))}
+                  </tr>
+                ))
+              ) : (
+                tickets.map((t, i) => (
+                  <motion.tr
+                    key={t.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: i * 0.03 }}
+                    className="border-t border-border/50 hover:bg-primary/[0.02] transition-colors cursor-pointer"
+                    onClick={() => setDescriptionTarget(t)}
+                  >
+                    <td className="py-3.5 px-4 font-mono text-xs text-primary font-bold whitespace-nowrap">{t.ticketId}</td>
+                    <td className="py-3.5 px-4 font-semibold max-w-[180px]">
+                      <span className="truncate block">{t.title}</span>
+                    </td>
+                    <td className="py-3.5 px-4 max-w-[150px]">
+                      <span className="text-xs text-muted-foreground truncate block">{t.description}</span>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <Badge variant="outline" className={cn("text-[10px] font-bold px-2 py-0.5 rounded-md border whitespace-nowrap", typeColor[t.type])}>
+                        {typeIcons[t.type]} {t.type}
+                      </Badge>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className={cn("text-xs font-bold flex items-center gap-1 whitespace-nowrap", priorityColors[t.priority])}>
+                        <span className={cn("w-2 h-2 rounded-full",
+                          t.priority === "Critical" ? "bg-destructive" :
+                            t.priority === "High" ? "bg-primary" :
+                              t.priority === "Medium" ? "bg-warning" : "bg-muted-foreground"
+                        )} />
+                        {t.priority}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4" onClick={e => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className={cn("text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all hover:ring-2 hover:ring-primary/20 whitespace-nowrap", statusColors[t.status])}>
+                            {t.status}
+                            <ArrowRight className="w-3 h-3 opacity-50" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="rounded-xl min-w-[160px] bg-popover border border-border shadow-xl z-50">
+                          <DropdownMenuLabel className="text-[10px] tracking-wider capitalize">Change Status</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          {allStatuses.map(s => (
+                            <DropdownMenuItem key={s} onClick={() => changeStatus(t.id, s)} className={cn("text-xs font-medium", t.status === s && "bg-primary/10 text-primary")}>
+                              {s} {t.status === s && <span className="ml-auto text-[10px]">✓</span>}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                    <td className="py-3.5 px-4 text-xs text-muted-foreground whitespace-nowrap">
+                      {t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—"}
+                    </td>
+                    <td className="py-3.5 px-4" onClick={e => e.stopPropagation()}>
+                      <div className="flex -space-x-1 overflow-hidden">
+                        {t.assignees?.slice(0, 3).map((a, idx) => (
+                          <div key={idx} className="w-6 h-6 rounded-md bg-primary/10 border border-card flex items-center justify-center text-[8px] font-bold text-primary" title={a.username}>
+                            {a.username.slice(0, 2).toUpperCase()}
+                          </div>
                         ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </td>
-                  <td className="py-3.5 px-4 text-xs text-muted-foreground whitespace-nowrap">{t.dueDate || "—"}</td>
-                  <td className="py-3.5 px-4" onClick={e => e.stopPropagation()}><AssigneeBadges ids={t.assignees} /></td>
-                  <td className="py-3.5 px-4" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => { setRemarkTarget(t.id); setRemarkText(t.remarks || ""); }}
-                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors whitespace-nowrap">
-                      <MessageSquare className="w-3.5 h-3.5" />
-                      {t.remarks ? <span className="truncate max-w-[80px]">{t.remarks}</span> : "Add"}
-                    </button>
-                  </td>
-                  <td className="py-3.5 px-4" onClick={e => e.stopPropagation()}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted transition-colors">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="rounded-xl bg-popover border border-border shadow-xl z-50">
-                        <DropdownMenuItem onClick={() => openEdit(t)}><Pencil className="w-3.5 h-3.5 mr-2" />Edit</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(t)}><Trash2 className="w-3.5 h-3.5 mr-2" />Delete</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </td>
-                </motion.tr>
-              ))}
+                        {t.assignees?.length > 3 && (
+                          <div className="w-6 h-6 rounded-md bg-muted border border-card flex items-center justify-center text-[8px] font-bold text-muted-foreground">
+                            +{t.assignees.length - 3}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => { setRemarkTarget(t.id); setRemarkText(t.remarks || ""); }}
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors whitespace-nowrap">
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        {t.remarks ? <span className="truncate max-w-[80px]">{t.remarks}</span> : "Add"}
+                      </button>
+                    </td>
+                    <td className="py-3.5 px-4" onClick={e => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted transition-colors opacity-0 group-hover:opacity-100">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="rounded-xl bg-popover border border-border shadow-xl z-50">
+                          <DropdownMenuItem onClick={() => openEdit(t)} className="cursor-pointer"><Pencil className="w-3.5 h-3.5 mr-2" />Edit Ticket</DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive cursor-pointer" onClick={() => setDeleteTarget(t)}><Trash2 className="w-3.5 h-3.5 mr-2" />Delete Ticket</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </motion.tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {filtered.length === 0 && (
+      {!loading && tickets.length === 0 && (
         <div className="text-center py-16 animate-fade-in">
           <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
             <Bug className="w-8 h-8 text-muted-foreground" />
@@ -267,46 +352,47 @@ const Tickets = () => {
         </div>
       )}
 
-      <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} pageSize={PAGE_SIZE} />
+      {!loading && tickets.length > 0 && (
+        <div className="mt-6">
+          <PaginationControls
+            page={page}
+            totalPages={pagination.totalPages}
+            onPageChange={setPage}
+            totalItems={pagination.totalItems}
+            pageSize={PAGE_SIZE}
+          />
+        </div>
+      )}
 
-      {/* Add/Edit Ticket Form */}
-      <CrudDialog open={dialogOpen} onClose={() => setDialogOpen(false)} title={editingId ? "Edit Ticket" : "Add Ticket"} onSave={handleSave} size="lg">
+      {/* Rise Ticket Form */}
+      <CrudDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        title={editingId ? "Edit Ticket" : "Rise Ticket"}
+        subtitle={editingId ? "Update ticket details" : "Create a new support or task ticket"}
+        icon={<Bug className="w-5 h-5" />}
+        onSave={handleSave}
+        saveLabel={editingId ? "Update Ticket" : "Rise Ticket"}
+        size="lg"
+      >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField label="Title" icon={Bug} required error={errors.title}>
-            <input className={cn("premium-input", errors.title && "border-destructive focus:ring-destructive/20 focus:border-destructive")}
+            <input className={cn("premium-input", errors.title && "!border-destructive focus:ring-destructive/20")}
               placeholder="What's the issue?" value={editData.title || ""} onChange={e => { setEditData(d => ({ ...d, title: e.target.value })); setErrors(p => ({ ...p, title: "" })); }} />
           </FormField>
           <FormField label="Project" icon={FileText}>
             <AnimatedDropdown
-              options={[{ label: "General", value: "" }, ...initialProjects.map(p => ({ label: p.name, value: p.id }))]}
-              value={editData.projectId || ""}
-              onChange={v => setEditData(d => ({ ...d, projectId: v || null }))}
+              options={[{ label: "General", value: "" }, ...projects.map(p => ({ label: p.name, value: p.id.toString() }))]}
+              value={editData.projectId?.toString() || ""}
+              onChange={v => setEditData(d => ({ ...d, projectId: v ? parseInt(v) : null }))}
               placeholder="Select project"
             />
           </FormField>
         </div>
         <FormField label="Description" icon={FileText} required error={errors.description}>
-          <textarea className={cn("premium-input min-h-[80px] resize-none", errors.description && "border-destructive focus:ring-destructive/20 focus:border-destructive")}
+          <textarea className={cn("premium-input min-h-[80px] resize-none", errors.description && "!border-destructive focus:ring-destructive/20")}
             placeholder="Describe the issue in detail..." rows={3} value={editData.description || ""} onChange={e => { setEditData(d => ({ ...d, description: e.target.value })); setErrors(p => ({ ...p, description: "" })); }} />
         </FormField>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormField label="Start Date" icon={Calendar} required error={errors.startDate}>
-            <AnimatedDatePicker
-              value={editData.startDate || ""}
-              onChange={v => { setEditData(d => ({ ...d, startDate: v })); setErrors(p => ({ ...p, startDate: "" })); }}
-              placeholder="Select start date"
-              error={!!errors.startDate}
-            />
-          </FormField>
-          <FormField label="End Date" icon={Calendar} required error={errors.endDate}>
-            <AnimatedDatePicker
-              value={editData.endDate || ""}
-              onChange={v => { setEditData(d => ({ ...d, endDate: v })); setErrors(p => ({ ...p, endDate: "" })); }}
-              placeholder="Select end date"
-              error={!!errors.endDate}
-            />
-          </FormField>
-        </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <FormField label="Type">
             <AnimatedDropdown
@@ -322,16 +408,16 @@ const Tickets = () => {
               onChange={v => setEditData(d => ({ ...d, priority: v as any }))}
             />
           </FormField>
-          <FormField label="Status">
-            <AnimatedDropdown
-              options={allStatuses.map(s => ({ label: s, value: s }))}
-              value={editData.status || "Open"}
-              onChange={v => setEditData(d => ({ ...d, status: v as any }))}
+          <FormField label="Due Date" icon={Calendar}>
+            <AnimatedDatePicker
+              value={editData.dueDate || ""}
+              onChange={v => setEditData(d => ({ ...d, dueDate: v }))}
+              placeholder="Select due date"
             />
           </FormField>
         </div>
         <FormField label="Assignees" icon={Users}>
-          <AssigneeSelector selected={editData.assignees || []} onChange={assignees => setEditData(d => ({ ...d, assignees }))} />
+          <MemberSelector selected={editData.assignees || []} onChange={assignees => setEditData(d => ({ ...d, assignees }))} />
         </FormField>
       </CrudDialog>
 

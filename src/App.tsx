@@ -9,6 +9,8 @@ import Notes from "./pages/Notes";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
+import ProtectedRoute from "./components/ProtectedRoute";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -19,9 +21,14 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/" element={<Projects />} />
-          <Route path="/tickets" element={<Tickets />} />
-          <Route path="/notes" element={<Notes />} />
+
+          {/* Protected Routes */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<Projects />} />
+            <Route path="/tickets" element={<Tickets />} />
+            <Route path="/notes" element={<Notes />} />
+          </Route>
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

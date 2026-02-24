@@ -17,9 +17,10 @@ interface AnimatedDropdownProps {
   className?: string;
   error?: boolean;
   size?: "sm" | "md";
+  disabled?: boolean;
 }
 
-export function AnimatedDropdown({ options, value, onChange, placeholder = "Select...", className, error, size = "md" }: AnimatedDropdownProps) {
+export function AnimatedDropdown({ options, value, onChange, placeholder = "Select...", className, error, size = "md", disabled }: AnimatedDropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const selected = options.find(o => o.value === value);
@@ -36,12 +37,14 @@ export function AnimatedDropdown({ options, value, onChange, placeholder = "Sele
     <div ref={ref} className={cn("relative", className)}>
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        disabled={disabled}
+        onClick={() => !disabled && setOpen(!open)}
         className={cn(
           "w-full flex items-center justify-between gap-2 border-2 rounded-xl bg-background text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary",
           size === "sm" ? "px-3 py-2 text-xs" : "px-3.5 py-2.5",
-          error ? "border-destructive focus:ring-destructive/20 focus:border-destructive" : "border-input",
-          open && "ring-2 ring-primary/20 border-primary"
+          error ? "!border-destructive focus:ring-destructive/20" : "border-input",
+          open && "ring-2 ring-primary/20 border-primary",
+          disabled && "opacity-50 cursor-not-allowed bg-muted"
         )}
       >
         <span className={cn(!selected && "text-muted-foreground/50")}>

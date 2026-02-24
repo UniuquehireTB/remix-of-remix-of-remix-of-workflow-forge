@@ -4,6 +4,7 @@ import { Mail, Lock, Eye, EyeOff, Rocket, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { authService } from "@/services/authService";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -27,15 +28,24 @@ const Login = () => {
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
-    setTimeout(() => {
+
+    try {
+      await authService.login({ email, password });
       setLoading(false);
       toast({ title: "✅ Welcome back!", description: "You have signed in successfully." });
       navigate("/");
-    }, 1000);
+    } catch (error: any) {
+      setLoading(false);
+      toast({
+        title: "❌ Login Failed",
+        description: error.message || "Invalid email or password.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -76,9 +86,8 @@ const Login = () => {
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input type="email" value={email} onChange={e => { setEmail(e.target.value); setErrors(prev => ({ ...prev, email: "" })); }}
                   placeholder="you@company.com"
-                  className={cn("premium-input pl-11", errors.email && "border-destructive focus:ring-destructive/20 focus:border-destructive")} />
+                  className={cn("premium-input !pl-11", errors.email && "border-destructive focus:ring-destructive/20 focus:border-destructive")} />
               </div>
-              {errors.email && <p className="text-xs text-destructive font-medium flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-destructive" />{errors.email}</p>}
             </div>
 
             <div className="space-y-1.5">
@@ -87,12 +96,11 @@ const Login = () => {
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input type={showPassword ? "text" : "password"} value={password} onChange={e => { setPassword(e.target.value); setErrors(prev => ({ ...prev, password: "" })); }}
                   placeholder="Enter your password"
-                  className={cn("premium-input pl-11 pr-11", errors.password && "border-destructive focus:ring-destructive/20 focus:border-destructive")} />
+                  className={cn("premium-input !pl-11 !pr-11", errors.password && "border-destructive focus:ring-destructive/20 focus:border-destructive")} />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              {errors.password && <p className="text-xs text-destructive font-medium flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-destructive" />{errors.password}</p>}
             </div>
 
             <button type="submit" disabled={loading}

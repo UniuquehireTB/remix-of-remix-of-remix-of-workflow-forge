@@ -1,28 +1,34 @@
 import { useState, useRef, useEffect } from "react";
 import { AppLayout } from "@/components/AppLayout";
-import { Plus, Pin, Trash2, Check, List, FileText, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SearchBar } from "@/components/SearchBar";
 import { PaginationControls } from "@/components/PaginationControls";
-import { DeleteDialog } from "@/components/CrudDialog";
-import { FilterDropdown } from "@/components/AnimatedDropdown";
-import { initialProjects } from "@/lib/data";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { DeleteDialog, CrudDialog } from "@/components/CrudDialog";
+import { FilterDropdown, AnimatedDropdown } from "@/components/AnimatedDropdown";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { ProjectTabs } from "@/components/ProjectTabs";
+import { Pin, Trash2, Check, List, FileText, X, ChevronRight, Hash, Share2, Users, Shield, ShieldAlert, ShieldOff } from "lucide-react";
+import { projectService, noteService, authService } from "@/services/authService";
+import { MemberSelector } from "@/components/MemberSelector";
+import { FormField } from "@/components/FormField";
+import { Switch } from "@/components/ui/switch";
 
 const PAGE_SIZE = 12;
 
 interface NoteItem {
-  id: string;
+  id: number;
   title: string;
   content: string;
   type: "note" | "list";
   listItems?: { id: string; text: string; checked: boolean }[];
   pinned: boolean;
-  createdDate: string;
-  projectId: string | null;
+  projectId: any | null;
+  userId: number;
+  user?: { id: number; username: string };
+  shares?: any[];
+  canEdit?: boolean;
 }
 
 const noteColors = [
@@ -34,121 +40,206 @@ const noteColors = [
   "bg-card border-border",
 ];
 
-const initialNotes: NoteItem[] = [
-  { id: "N-001", title: "API Design Guidelines", content: "RESTful conventions, versioning strategy, and error handling patterns...", type: "note", pinned: true, createdDate: "Feb 22", projectId: "p4" },
-  { id: "N-002", title: "Sprint 14 Planning", content: "Key objectives: auth overhaul, push notifications, performance...", type: "note", pinned: true, createdDate: "Feb 20", projectId: "p1" },
-  { id: "N-003", title: "Shopping List", content: "", type: "list", listItems: [
-    { id: "l1", text: "Buy groceries", checked: true },
-    { id: "l2", text: "Review PRs", checked: false },
-    { id: "l3", text: "Update docs", checked: false },
-  ], pinned: false, createdDate: "Feb 18", projectId: null },
-  { id: "N-004", title: "Meeting Notes", content: "Discuss roadmap for Q2, review team capacity and sprint velocity.", type: "note", pinned: false, createdDate: "Feb 15", projectId: "p2" },
-];
-
 const Notes = () => {
-  const [notes, setNotes] = useState<NoteItem[]>(initialNotes);
+  const [notes, setNotes] = useState<NoteItem[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const [typeFilter, setTypeFilter] = useState<string>("All");
-  const [projectFilter, setProjectFilter] = useState<string>("All");
+  const [projectFilter, setProjectFilter] = useState<any>("All");
   const [deleteTarget, setDeleteTarget] = useState<NoteItem | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [activeNote, setActiveNote] = useState<NoteItem | null>(null);
   const [createType, setCreateType] = useState<"note" | "list">("note");
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
-  const [newProjectId, setNewProjectId] = useState<string | null>(null);
+  const [newProjectId, setNewProjectId] = useState<any | null>(null);
   const [newListItems, setNewListItems] = useState<{ id: string; text: string; checked: boolean }[]>([{ id: "new1", text: "", checked: false }]);
-  const titleRef = useRef<HTMLInputElement>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Sharing State
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareTarget, setShareTarget] = useState<NoteItem | null>(null);
+  const [sharedUserIds, setSharedUserIds] = useState<number[]>([]);
+  const [sharePermissions, setSharePermissions] = useState<Record<number, boolean>>({});
+
   const { toast } = useToast();
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelMode, setPanelMode] = useState<"create" | "edit">("create");
+  const currentUser = authService.getCurrentUser();
 
-  const filtered = notes.filter(n => {
-    const matchSearch = n.title.toLowerCase().includes(search.toLowerCase()) || n.content.toLowerCase().includes(search.toLowerCase());
-    const matchType = typeFilter === "All" || n.type === typeFilter;
-    const matchProject = projectFilter === "All" || (projectFilter === "General" ? !n.projectId : n.projectId === projectFilter);
-    return matchSearch && matchType && matchProject;
-  });
+  const fetchNotes = async () => {
+    setLoading(true);
+    try {
+      const response = await noteService.getAll({
+        search,
+        type: typeFilter,
+        projectId: projectFilter === "All" ? undefined : (projectFilter === "General" ? "null" : projectFilter),
+        page,
+        limit: PAGE_SIZE
+      });
+      setNotes(response.data);
+      setTotalPages(response.pagination.totalPages);
+      setTotalItems(response.pagination.totalItems);
+    } catch (err: any) {
+      toast({ title: "❌ Error", description: err.response?.data?.error || "Failed to load notes", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const sorted = [...filtered].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
-  const paginated = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const fetchProjects = async () => {
+    try {
+      const response = await projectService.getAll({ limit: 100 });
+      setProjects(response.data);
+    } catch (err) {
+      console.error("Failed to load projects", err);
+    }
+  };
 
   useEffect(() => {
-    if (createOpen && titleRef.current) titleRef.current.focus();
-  }, [createOpen]);
+    fetchNotes();
+  }, [search, typeFilter, projectFilter, page]);
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  const openNoteDetail = (note: NoteItem) => {
+    setActiveNote(note);
+    setEditingId(note.id);
+    setCreateType(note.type);
+    setNewTitle(note.title);
+    setNewContent(note.content);
+    setNewProjectId(note.projectId);
+    setNewListItems(note.listItems || [{ id: "new1", text: "", checked: false }]);
+    setPanelMode("edit");
+    setPanelOpen(true);
+  };
+
+  const openShare = (note: NoteItem) => {
+    setShareTarget(note);
+    const ids = note.shares?.map(s => s.sharedWithUser.id) || [];
+    const perms: Record<number, boolean> = {};
+    note.shares?.forEach(s => {
+      perms[s.sharedWithUser.id] = !!s.canEdit;
+    });
+    setSharedUserIds(ids);
+    setSharePermissions(perms);
+    setShareOpen(true);
+  };
+
+  const handleShare = async () => {
+    if (!shareTarget) return;
+    try {
+      const shares = sharedUserIds.map(uid => ({
+        userId: uid,
+        canEdit: !!sharePermissions[uid]
+      }));
+      await noteService.share(shareTarget.id, shares);
+      toast({ title: "✅ Success", description: "Sharing permissions updated." });
+      setShareOpen(false);
+      fetchNotes();
+    } catch (err) {
+      toast({ title: "❌ Error", description: "Failed to update sharing", variant: "destructive" });
+    }
+  };
+
+  const togglePermission = (userId: number, canEdit: boolean) => {
+    setSharePermissions(prev => ({ ...prev, [userId]: canEdit }));
+  };
 
   const openCreate = (type: "note" | "list") => {
+    setActiveNote(null);
     setCreateType(type);
     setNewTitle("");
     setNewContent("");
-    setNewProjectId(null);
+    setNewProjectId(projectFilter === "All" || projectFilter === "General" ? null : projectFilter);
     setNewListItems([{ id: "new1", text: "", checked: false }]);
-    setCreateOpen(true);
+    setPanelMode("create");
+    setPanelOpen(true);
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!newTitle.trim()) {
       toast({ title: "⚠️ Title Required", description: "Please enter a title.", variant: "destructive" });
       return;
     }
-    const newN: NoteItem = {
-      id: `N-${Date.now().toString().slice(-3)}`,
-      title: newTitle.trim(),
-      content: createType === "note" ? newContent.trim() : "",
-      type: createType,
-      listItems: createType === "list" ? newListItems.filter(i => i.text.trim()) : undefined,
-      pinned: false,
-      createdDate: "Just now",
-      projectId: newProjectId,
-    };
-    setNotes(prev => [newN, ...prev]);
-    setCreateOpen(false);
-    toast({ title: "📝 Note Created", description: "Your note has been saved." });
+    try {
+      await noteService.create({
+        title: newTitle.trim(),
+        content: createType === "note" ? newContent.trim() : "",
+        type: createType,
+        listItems: createType === "list" ? newListItems.filter(i => i.text.trim()) : undefined,
+        projectId: newProjectId,
+      });
+      fetchNotes();
+      setPanelOpen(false);
+      toast({ title: "📝 Note Created", description: "Your note has been saved." });
+    } catch (err) {
+      toast({ title: "❌ Error", description: "Failed to create note", variant: "destructive" });
+    }
   };
 
-  const updateNote = (id: string, field: "title" | "content", value: string) => {
-    setNotes(prev => prev.map(n => n.id === id ? { ...n, [field]: value } : n));
+  const handleUpdate = async () => {
+    if (!newTitle.trim()) {
+      toast({ title: "⚠️ Title Required", description: "Please enter a title.", variant: "destructive" });
+      return;
+    }
+    if (!editingId) return;
+    try {
+      await noteService.update(editingId, {
+        title: newTitle.trim(),
+        content: createType === "note" ? newContent.trim() : "",
+        type: createType,
+        listItems: createType === "list" ? newListItems.filter(i => i.text.trim()) : undefined,
+        projectId: newProjectId,
+      });
+      fetchNotes();
+      setPanelOpen(false);
+      toast({ title: "✅ Note Updated" });
+    } catch (err) {
+      toast({ title: "❌ Error", description: "Failed to update note", variant: "destructive" });
+    }
   };
 
-  const updateListItem = (noteId: string, itemId: string, field: "text" | "checked", value: string | boolean) => {
-    setNotes(prev => prev.map(n => n.id === noteId ? {
-      ...n,
-      listItems: n.listItems?.map(i => i.id === itemId ? { ...i, [field]: value } : i)
-    } : n));
+  const togglePin = async (id: number) => {
+    try {
+      await noteService.togglePin(id);
+      setNotes(prev => prev.map(n => n.id === id ? { ...n, pinned: !n.pinned } : n));
+    } catch (err) {
+      toast({ title: "❌ Error", description: "Failed to toggle pin", variant: "destructive" });
+    }
   };
 
-  const addListItemToNote = (noteId: string) => {
-    setNotes(prev => prev.map(n => n.id === noteId ? {
-      ...n,
-      listItems: [...(n.listItems || []), { id: `li-${Date.now()}`, text: "", checked: false }]
-    } : n));
-  };
-
-  const togglePin = (id: string) => {
-    setNotes(prev => prev.map(n => n.id === id ? { ...n, pinned: !n.pinned } : n));
-  };
-
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deleteTarget) {
-      setNotes(prev => prev.filter(n => n.id !== deleteTarget.id));
-      toast({ title: "🗑️ Note Deleted", variant: "destructive" });
+      try {
+        await noteService.delete(deleteTarget.id);
+        fetchNotes();
+        toast({ title: "🗑️ Note Deleted", variant: "destructive" });
+      } catch (err) {
+        toast({ title: "❌ Error", description: "Failed to delete note", variant: "destructive" });
+      }
     }
     setDeleteTarget(null);
   };
 
-  const saveAndClose = (id: string) => {
-    setEditingId(null);
-    toast({ title: "✅ Note Saved" });
-  };
-
-  const getColor = (id: string) => {
-    const idx = id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) % noteColors.length;
+  const getColor = (id: number) => {
+    const idx = id % noteColors.length;
     return noteColors[idx];
   };
 
+  const isShared = activeNote && activeNote.userId !== currentUser?.id;
+  const canEdit = activeNote ? activeNote.canEdit : true;
+
   return (
     <AppLayout title="Notes" subtitle="Quick notes and checklists">
-      {/* Top Bar - aligned properly */}
+      <ProjectTabs projects={projects} activeProjectId={projectFilter} onChange={v => { setProjectFilter(v); setPage(1); }} />
+
+      {/* Top Bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
         <div className="flex items-center gap-2 flex-wrap">
           <FilterDropdown
@@ -156,20 +247,6 @@ const Notes = () => {
             value={typeFilter === "All" ? "All" : typeFilter}
             onChange={v => { setTypeFilter(v); setPage(1); }}
             allLabel="All Types"
-          />
-          <FilterDropdown
-            options={["General", ...initialProjects.map(p => p.name)]}
-            value={projectFilter === "All" ? "All" : projectFilter === "General" ? "General" : (initialProjects.find(p => p.id === projectFilter)?.name || projectFilter)}
-            onChange={v => {
-              if (v === "All") setProjectFilter("All");
-              else if (v === "General") setProjectFilter("General");
-              else {
-                const proj = initialProjects.find(p => p.name === v);
-                setProjectFilter(proj ? proj.id : v);
-              }
-              setPage(1);
-            }}
-            allLabel="All Projects"
           />
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -185,178 +262,321 @@ const Notes = () => {
 
       {/* Masonry Grid */}
       <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4 space-y-4">
-        {paginated.map((note, i) => (
+        {notes.map((note, i) => (
           <motion.div
             key={note.id}
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: i * 0.04 }}
             className={cn(
-              "break-inside-avoid rounded-2xl border-2 p-5 transition-all duration-200 hover:shadow-lg group",
+              "break-inside-avoid rounded-2xl border-2 p-5 transition-all duration-200 hover:shadow-lg group cursor-pointer relative",
               getColor(note.id),
               editingId === note.id && "ring-2 ring-primary/30"
             )}
-            onClick={() => { if (editingId !== note.id) setEditingId(note.id); }}
+            onClick={() => openNoteDetail(note)}
           >
-            {note.pinned && (
-              <div className="flex items-center gap-1 text-warning text-[10px] font-bold uppercase tracking-wider mb-2">
-                <Pin className="w-3 h-3" /> Pinned
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5">
+                {note.userId !== currentUser?.id && (
+                  <span className="text-[9px] font-black bg-primary text-primary-foreground px-2 py-0.5 rounded uppercase tracking-tighter shadow-sm">Shared</span>
+                )}
+                {note.pinned && (
+                  <div className="flex items-center gap-1 text-warning text-[10px] font-bold uppercase tracking-wider">
+                    <Pin className="w-3 h-3" />
+                  </div>
+                )}
               </div>
-            )}
-
-            {/* Type badge + project */}
-            <div className="flex items-center gap-1.5 mb-2">
-              {note.type === "list" ? <List className="w-3 h-3 text-primary" /> : <FileText className="w-3 h-3 text-primary" />}
-              <span className="text-[10px] font-semibold text-muted-foreground capitalize">{note.type}</span>
-              {note.projectId && (
-                <span className="text-[10px] font-medium text-primary/70 bg-primary/5 px-1.5 py-0.5 rounded">
-                  {initialProjects.find(p => p.id === note.projectId)?.name || "Project"}
-                </span>
-              )}
+              <div className="flex items-center gap-1.5">
+                {note.type === "list" ? <List className="w-3.5 h-3.5 text-primary" /> : <FileText className="w-3.5 h-3.5 text-primary" />}
+                <span className="text-[10px] font-semibold text-muted-foreground capitalize tracking-tight">{note.type}</span>
+              </div>
             </div>
 
             {/* Title */}
-            {editingId === note.id ? (
-              <input value={note.title} onChange={e => updateNote(note.id, "title", e.target.value)}
-                onClick={e => e.stopPropagation()} className="w-full text-base font-bold bg-transparent focus:outline-none mb-2" autoFocus />
-            ) : (
-              <h3 className="font-bold text-base mb-2 line-clamp-2">{note.title}</h3>
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <h3 className="font-bold text-base line-clamp-2 flex-1 tracking-tight">{note.title}</h3>
+              {note.userId === currentUser?.id && (
+                <button onClick={(e) => { e.stopPropagation(); openShare(note); }} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors opacity-0 group-hover:opacity-100">
+                  <Share2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Creator info for shared notes */}
+            {note.userId !== currentUser?.id && (
+              <div className="flex items-center gap-1.5 mb-2.5 opacity-70">
+                <div className="w-5 h-5 rounded-lg bg-primary/20 flex items-center justify-center text-[9px] font-black text-primary border border-primary/20">
+                  {note.user?.username.slice(0, 2).toUpperCase()}
+                </div>
+                <span className="text-[10px] font-bold text-muted-foreground">From {note.user?.username}</span>
+              </div>
             )}
 
             {/* Content */}
             {note.type === "note" ? (
-              editingId === note.id ? (
-                <textarea value={note.content} onChange={e => updateNote(note.id, "content", e.target.value)}
-                  onClick={e => e.stopPropagation()} className="w-full text-sm bg-transparent focus:outline-none resize-none min-h-[60px]" rows={4} />
-              ) : (
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-6">{note.content}</p>
-              )
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-6 leading-relaxed mb-4">{note.content}</p>
             ) : (
-              <div className="space-y-1.5" onClick={e => e.stopPropagation()}>
-                {note.listItems?.map(item => (
-                  <div key={item.id} className="flex items-center gap-2">
-                    <input type="checkbox" checked={item.checked}
-                      onChange={e => updateListItem(note.id, item.id, "checked", e.target.checked)}
-                      className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20" />
-                    {editingId === note.id ? (
-                      <input value={item.text} onChange={e => updateListItem(note.id, item.id, "text", e.target.value)}
-                        className="flex-1 bg-transparent text-sm focus:outline-none" />
-                    ) : (
-                      <span className={cn("text-sm", item.checked && "line-through text-muted-foreground")}>{item.text}</span>
-                    )}
+              <div className="space-y-1.5 mb-4" onClick={e => e.stopPropagation()}>
+                {note.listItems?.slice(0, 5).map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <div className={cn(
+                      "w-4 h-4 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors",
+                      item.checked ? "bg-primary border-primary" : "bg-card border-border group-hover:border-primary/30"
+                    )}>
+                      {item.checked && <Check className="w-2.5 h-2.5 text-primary-foreground stroke-[3px]" />}
+                    </div>
+                    <span className={cn("text-xs font-medium truncate", item.checked && "line-through text-muted-foreground/60")}>{item.text}</span>
                   </div>
                 ))}
-                {editingId === note.id && (
-                  <button onClick={() => addListItemToNote(note.id)} className="text-xs text-primary font-semibold">+ Add item</button>
+                {(note.listItems?.length || 0) > 5 && (
+                  <p className="text-[10px] text-muted-foreground font-semibold mt-1">+{note.listItems!.length - 5} more items</p>
                 )}
               </div>
             )}
 
             {/* Footer */}
-            <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/50">
-              <span className="text-[10px] text-muted-foreground font-medium">{note.createdDate}</span>
-              <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                {editingId === note.id && (
-                  <button onClick={() => saveAndClose(note.id)}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center bg-success/10 text-success hover:bg-success/20 transition-colors">
-                    <Check className="w-4 h-4" />
-                  </button>
+            <div className="flex items-center justify-between mt-auto pt-3 border-t border-border/50">
+              <div className="min-w-0">
+                {note.projectId && (
+                  <span className="text-[10px] font-bold text-primary/70 bg-primary/5 px-2 py-1 rounded-lg truncate block max-w-[100px] border border-primary/10">
+                    {projects.find(p => p.id.toString() === note.projectId.toString())?.name || "Project"}
+                  </span>
                 )}
-                <button onClick={() => togglePin(note.id)}
-                  className={cn("w-7 h-7 rounded-lg flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100",
-                    note.pinned ? "text-warning bg-warning/10" : "text-muted-foreground hover:bg-muted")}>
-                  <Pin className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={() => setDeleteTarget(note)}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+              </div>
+              <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                {note.userId === currentUser?.id && (
+                  <>
+                    <button onClick={() => togglePin(note.id)}
+                      className={cn("w-7 h-7 rounded-lg flex items-center justify-center transition-all opacity-0 group-hover:opacity-100",
+                        note.pinned ? "text-warning bg-warning/10 shadow-sm" : "text-muted-foreground hover:bg-muted")}>
+                      <Pin className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => setDeleteTarget(note)}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all opacity-0 group-hover:opacity-100">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
+                <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
             </div>
           </motion.div>
         ))}
       </div>
 
-      {filtered.length === 0 && (
-        <div className="text-center py-16 animate-fade-in">
-          <p className="text-muted-foreground font-medium">No notes yet</p>
-          <p className="text-xs text-muted-foreground/60 mt-1">Click "Note" or "List" to create one</p>
+      {!loading && notes.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-24 animate-fade-in opacity-40">
+          <div className="w-16 h-16 rounded-3xl bg-muted flex items-center justify-center mb-4">
+            <FileText className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <p className="text-muted-foreground font-bold text-lg">No notes found</p>
+          <p className="text-sm text-muted-foreground/60 mt-1">Start by creating a quick note or checklist</p>
         </div>
       )}
 
-      <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} totalItems={sorted.length} pageSize={PAGE_SIZE} />
+      <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} totalItems={totalItems} pageSize={PAGE_SIZE} />
       <DeleteDialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} itemName={deleteTarget?.title || "note"} />
 
-      {/* Create Note/List Popup */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-md rounded-2xl border-2 p-0 flex flex-col max-h-[85vh]">
-          <DialogHeader className="px-6 pt-5 pb-3 border-b border-border shrink-0">
-            <DialogTitle className="text-lg font-bold capitalize flex items-center gap-2">
-              {createType === "note" ? <FileText className="w-5 h-5 text-primary" /> : <List className="w-5 h-5 text-primary" />}
-              {createType === "note" ? "New Note" : "New List"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="px-6 py-4 space-y-4 overflow-y-auto flex-1">
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-foreground/80 capitalize">Title</label>
-              <input ref={titleRef} value={newTitle} onChange={e => setNewTitle(e.target.value)}
-                placeholder="Enter title..." className="premium-input" />
-            </div>
+      {/* Share Dialog */}
+      <CrudDialog
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        title="Share Note"
+        subtitle={`Select members and set individual permissions`}
+        icon={<Share2 className="w-5 h-5" />}
+        onSave={handleShare}
+        saveLabel="Update Permissions"
+        size="md"
+      >
+        <div className="space-y-6">
+          <MemberSelector
+            selected={sharedUserIds}
+            onChange={setSharedUserIds}
+            canEditMap={sharePermissions}
+            onEditToggle={togglePermission}
+          />
+        </div>
+      </CrudDialog>
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-foreground/80 capitalize">Project</label>
-              <FilterDropdown
-                options={["General", ...initialProjects.map(p => p.name)]}
-                value={!newProjectId ? "All" : newProjectId === "general" ? "General" : (initialProjects.find(p => p.id === newProjectId)?.name || "All")}
-                onChange={v => {
-                  if (v === "All") setNewProjectId(null);
-                  else if (v === "General") setNewProjectId(null);
-                  else {
-                    const proj = initialProjects.find(p => p.name === v);
-                    setNewProjectId(proj ? proj.id : null);
-                  }
-                }}
-                allLabel="No Project"
-              />
-            </div>
-
-            {createType === "note" ? (
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-foreground/80 capitalize">Content</label>
-                <textarea value={newContent} onChange={e => setNewContent(e.target.value)}
-                  placeholder="Take a note..." rows={4}
-                  className="premium-input min-h-[80px] resize-none" />
+      {/* Side Panel Design */}
+      <AnimatePresence>
+        {panelOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[60] bg-background/40 backdrop-blur-sm"
+              onClick={() => setPanelOpen(false)}
+            />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed top-0 right-0 z-[70] w-full max-w-lg h-full bg-card border-l border-border shadow-2xl flex flex-col"
+            >
+              <div className="px-6 py-6 border-b border-border flex items-center justify-between bg-card/50 backdrop-blur-xl">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0 border border-primary/10 shadow-inner">
+                    {createType === "note" ? <FileText className="w-6 h-6" /> : <List className="w-6 h-6" />}
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black leading-none mb-1.5 tracking-tight">
+                      {panelMode === "create" ? "Create New" : (canEdit ? "Edit" : "View")} {createType === "note" ? "Note" : "List"}
+                    </h2>
+                    <p className="text-[13px] text-muted-foreground font-semibold flex items-center gap-1.5">
+                      {isShared ? (
+                        <>
+                          <Users className="w-3.5 h-3.5 text-primary" />
+                          <span>Shared by <span className="text-primary">{activeNote?.user?.username}</span></span>
+                        </>
+                      ) : "Personal space for your thoughts"}
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setPanelOpen(false)} className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+                  <X className="w-5 h-5" />
+                </button>
               </div>
-            ) : (
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-foreground/80 capitalize">List Items</label>
-                <div className="space-y-2">
-                  {newListItems.map((item, idx) => (
-                    <div key={item.id} className="flex items-center gap-2">
-                      <input type="checkbox" checked={item.checked} onChange={e => {
-                        const updated = [...newListItems]; updated[idx].checked = e.target.checked; setNewListItems(updated);
-                      }} className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20" />
-                      <input value={item.text} onChange={e => {
-                        const updated = [...newListItems]; updated[idx].text = e.target.value; setNewListItems(updated);
-                      }} placeholder="List item..." className="flex-1 premium-input" />
-                      {newListItems.length > 1 && (
-                        <button type="button" onClick={() => setNewListItems(prev => prev.filter((_, i) => i !== idx))}
-                          className="text-muted-foreground hover:text-destructive"><X className="w-3.5 h-3.5" /></button>
+
+              <div className="flex-1 overflow-y-auto px-8 py-8 space-y-10 scrollbar-hide">
+                {!canEdit && (
+                  <div className="flex items-center gap-3.5 p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 shadow-sm animate-fade-in">
+                    <div className="w-9 h-9 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
+                      <ShieldAlert className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-black uppercase tracking-tight">Read-Only Access</p>
+                      <p className="text-xs font-semibold opacity-70">You can view content but cannot make any changes.</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="group space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 flex items-center gap-2 ml-1">
+                    <FileText className="w-3 h-3" /> Title
+                  </label>
+                  <input
+                    value={newTitle}
+                    onChange={e => setNewTitle(e.target.value)}
+                    placeholder="Enter a catchy title..."
+                    disabled={!canEdit}
+                    className="w-full bg-transparent text-3xl font-black focus:outline-none placeholder:text-muted-foreground/20 disabled:opacity-50 transition-all tracking-tight"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 flex items-center gap-2 ml-1">
+                      <Hash className="w-3 h-3" /> Association
+                    </label>
+                    <AnimatedDropdown
+                      options={[
+                        { label: "General Workspace", value: "" },
+                        ...projects.map(p => ({ label: p.name, value: p.id.toString() }))
+                      ]}
+                      value={newProjectId?.toString() || ""}
+                      onChange={v => setNewProjectId(v || null)}
+                      placeholder="Select project"
+                      disabled={!canEdit}
+                      className="rounded-2xl"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 flex items-center gap-2 ml-1">
+                    {createType === "note" ? <FileText className="w-3 h-3" /> : <List className="w-3 h-3" />}
+                    {createType === "note" ? "Your Thoughts" : "Checklist Items"}
+                  </label>
+
+                  {createType === "note" ? (
+                    <div className="relative group">
+                      <div className="absolute -inset-0.5 bg-gradient-to-br from-primary/10 to-transparent rounded-[26px] opacity-0 group-hover:opacity-100 transition duration-500 blur" />
+                      <textarea
+                        value={newContent}
+                        onChange={e => setNewContent(e.target.value)}
+                        placeholder="Start typing your note here... (Markdown supported)"
+                        disabled={!canEdit}
+                        className="relative w-full bg-muted/30 border border-border/50 rounded-3xl p-6 text-base min-h-[400px] focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all resize-none disabled:opacity-60 leading-relaxed font-medium"
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-3 bg-muted/20 border border-border/50 rounded-3xl p-6 shadow-inner">
+                      {newListItems.map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-4 group/item animate-fade-in">
+                          <button
+                            type="button"
+                            disabled={!canEdit}
+                            onClick={() => {
+                              const updated = [...newListItems];
+                              updated[idx].checked = !updated[idx].checked;
+                              setNewListItems(updated);
+                            }}
+                            className={cn(
+                              "w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all disabled:opacity-40 shadow-sm",
+                              item.checked ? "bg-primary border-primary" : "border-muted-foreground/30 hover:border-primary/50 bg-card"
+                            )}
+                          >
+                            {item.checked && <Check className="w-4 h-4 text-primary-foreground stroke-[3px]" />}
+                          </button>
+                          <input
+                            value={item.text}
+                            disabled={!canEdit}
+                            onChange={e => {
+                              const updated = [...newListItems];
+                              updated[idx].text = e.target.value;
+                              setNewListItems(updated);
+                            }}
+                            placeholder="Something to do..."
+                            className={cn(
+                              "flex-1 bg-transparent text-sm font-bold focus:outline-none disabled:opacity-50 transition-all",
+                              item.checked && "line-through text-muted-foreground font-medium"
+                            )}
+                          />
+                          {canEdit && (
+                            <button
+                              type="button"
+                              onClick={() => setNewListItems(prev => prev.filter((_, i) => i !== idx))}
+                              className="opacity-0 group-hover/item:opacity-100 p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {canEdit && (
+                        <button
+                          type="button"
+                          onClick={() => setNewListItems(prev => [...prev, { id: `new-${Date.now()}`, text: "", checked: false }])}
+                          className="text-[13px] text-primary font-black mt-6 hover:translate-x-1 transition-transform flex items-center gap-3 w-fit"
+                        >
+                          <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">+</div>
+                          Add New Task
+                        </button>
                       )}
                     </div>
-                  ))}
-                  <button type="button" onClick={() => setNewListItems(prev => [...prev, { id: `new-${Date.now()}`, text: "", checked: false }])}
-                    className="text-xs text-primary font-semibold hover:text-primary/80">+ Add item</button>
+                  )}
                 </div>
               </div>
-            )}
-          </div>
-          <div className="px-6 py-4 border-t border-border shrink-0 bg-muted/30 flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setCreateOpen(false)} className="rounded-xl px-5 h-9 text-xs">Cancel</Button>
-            <Button onClick={handleCreate} className="rounded-xl px-5 h-9 text-xs shadow-lg shadow-primary/25">Save</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+
+              <div className="p-8 border-t border-border bg-card shadow-[0_-8px_30px_-15px_rgba(0,0,0,0.1)] flex items-center justify-between">
+                <Button variant="ghost" onClick={() => setPanelOpen(false)} className="rounded-2xl px-6 font-bold">Close</Button>
+                {canEdit && (
+                  <Button
+                    onClick={panelMode === "create" ? handleCreate : handleUpdate}
+                    className="rounded-2xl px-10 h-12 font-black shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all active:scale-95"
+                  >
+                    {panelMode === "create" ? "Build Note" : "Sync Changes"}
+                  </Button>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </AppLayout>
   );
 };

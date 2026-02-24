@@ -13,19 +13,31 @@ interface CrudDialogProps {
   open: boolean;
   onClose: () => void;
   title: string;
+  subtitle?: string;
+  icon?: ReactNode;
   onSave: () => void;
   children: ReactNode;
   saveLabel?: string;
   size?: "sm" | "md" | "lg";
 }
 
-export function CrudDialog({ open, onClose, title, onSave, children, saveLabel = "Save Changes", size = "md" }: CrudDialogProps) {
+export function CrudDialog({ open, onClose, title, subtitle, icon, onSave, children, saveLabel = "Save Changes", size = "md" }: CrudDialogProps) {
   const maxW = size === "lg" ? "max-w-2xl" : size === "sm" ? "max-w-sm" : "max-w-lg";
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className={`${maxW} rounded-2xl border-2 p-0 flex flex-col max-h-[85vh]`}>
-        <DialogHeader className="px-6 pt-5 pb-3 border-b border-border shrink-0">
-          <DialogTitle className="text-lg font-bold capitalize">{title}</DialogTitle>
+      <DialogContent className={`${maxW} rounded-2xl border-2 p-0 flex flex-col max-h-[85vh] [&>button:last-child]:top-7 [&>button:last-child]:right-6`}>
+        <DialogHeader className="px-6 py-5 border-b border-border shrink-0">
+          <div className="flex items-center gap-4">
+            {icon && (
+              <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                {icon}
+              </div>
+            )}
+            <div>
+              <DialogTitle className="text-xl font-bold capitalize leading-none mb-1.5">{title}</DialogTitle>
+              {subtitle && <p className="text-[13px] text-muted-foreground font-medium leading-tight">{subtitle}</p>}
+            </div>
+          </div>
         </DialogHeader>
         <div className="space-y-4 px-6 py-4 overflow-y-auto flex-1">{children}</div>
         <DialogFooter className="px-6 py-4 border-t border-border gap-2 shrink-0 bg-muted/30">

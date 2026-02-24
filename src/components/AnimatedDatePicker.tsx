@@ -45,7 +45,7 @@ export function AnimatedDatePicker({ value, onChange, placeholder = "Pick a date
         onClick={() => setOpen(!open)}
         className={cn(
           "w-full flex items-center gap-2 border-2 rounded-xl bg-background px-3.5 py-2.5 text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary",
-          error ? "border-destructive focus:ring-destructive/20 focus:border-destructive" : "border-input",
+          error ? "!border-destructive focus:ring-destructive/20" : "border-input",
           open && "ring-2 ring-primary/20 border-primary"
         )}
       >
