@@ -23,18 +23,18 @@ export function CrudDialog({ open, onClose, title, onSave, children, saveLabel =
   const maxW = size === "lg" ? "max-w-2xl" : size === "sm" ? "max-w-sm" : "max-w-lg";
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className={`${maxW} max-h-[85vh] overflow-y-auto rounded-2xl border-2 p-0`}>
-        <DialogHeader className="px-6 pt-6 pb-4 border-b border-border">
-          <DialogTitle className="text-xl font-bold capitalize">{title}</DialogTitle>
+      <DialogContent className={`${maxW} rounded-2xl border-2 p-0 flex flex-col max-h-[85vh]`}>
+        <DialogHeader className="px-6 pt-5 pb-3 border-b border-border shrink-0">
+          <DialogTitle className="text-lg font-bold capitalize">{title}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-5 px-6 py-5">{children}</div>
-        <DialogFooter className="px-6 pb-6 pt-2 gap-2">
-          <Button variant="ghost" onClick={onClose} className="rounded-xl px-6">
-            <X className="w-4 h-4 mr-1.5" />
+        <div className="space-y-4 px-6 py-4 overflow-y-auto flex-1">{children}</div>
+        <DialogFooter className="px-6 py-4 border-t border-border gap-2 shrink-0 bg-muted/30">
+          <Button variant="ghost" onClick={onClose} className="rounded-xl px-5 h-9 text-xs">
+            <X className="w-3.5 h-3.5 mr-1.5" />
             Cancel
           </Button>
-          <Button onClick={onSave} className="rounded-xl px-6 shadow-lg shadow-primary/25">
-            <Check className="w-4 h-4 mr-1.5" />
+          <Button onClick={onSave} className="rounded-xl px-5 h-9 text-xs shadow-lg shadow-primary/25">
+            <Check className="w-3.5 h-3.5 mr-1.5" />
             {saveLabel}
           </Button>
         </DialogFooter>

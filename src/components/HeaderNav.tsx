@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
-import { Bell, User, Moon, Sun, LogOut, FolderKanban, Bug, FileText, X, Rocket } from "lucide-react";
+import { Bell, User, Moon, Sun, LogOut, FolderKanban, Bug, FileText, X, Rocket, UserPlus, Mail, Lock, Eye, EyeOff, Shield, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AnimatedDropdown } from "@/components/AnimatedDropdown";
+import { useToast } from "@/hooks/use-toast";
 
 const navItems = [
   { title: "Projects", url: "/", icon: FolderKanban },
@@ -19,12 +22,26 @@ const notifications = [
   { id: 5, title: "Bug BG-892 marked as Critical", desc: "Priority escalated by James Park", time: "2h ago", unread: false },
 ];
 
+const roles = ["Admin", "Manager", "Developer"];
+
 export function HeaderNav() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [signupOpen, setSignupOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { toast } = useToast();
+
+  // Signup state
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+  const [signupConfirm, setSignupConfirm] = useState("");
+  const [signupRole, setSignupRole] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [showConf, setShowConf] = useState(false);
+  const [signupErrors, setSignupErrors] = useState<Record<string, string>>({});
+  const [signupLoading, setSignupLoading] = useState(false);
 
   useEffect(() => {
     setDarkMode(document.documentElement.classList.contains("dark"));
@@ -41,6 +58,30 @@ export function HeaderNav() {
   }, [location.pathname]);
 
   const unreadCount = notifications.filter(n => n.unread).length;
+
+  const handleSignup = (e: React.FormEvent) => {
+    e.preventDefault();
+    const errs: Record<string, string> = {};
+    if (!signupEmail.trim()) errs.email = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(signupEmail)) errs.email = "Enter a valid email";
+    if (!signupPassword.trim()) errs.password = "Password is required";
+    else if (signupPassword.length < 6) errs.password = "Min 6 characters";
+    if (!signupConfirm.trim()) errs.confirm = "Confirm password";
+    else if (signupPassword !== signupConfirm) errs.confirm = "Passwords do not match";
+    if (!signupRole) errs.role = "Select a role";
+    setSignupErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      toast({ title: "⚠️ Validation Error", description: Object.values(errs).join(" • "), variant: "destructive" });
+      return;
+    }
+    setSignupLoading(true);
+    setTimeout(() => {
+      setSignupLoading(false);
+      setSignupOpen(false);
+      setSignupEmail(""); setSignupPassword(""); setSignupConfirm(""); setSignupRole("");
+      toast({ title: "🎉 User Created", description: "New user account has been created." });
+    }, 1000);
+  };
 
   return (
     <>
@@ -147,6 +188,13 @@ export function HeaderNav() {
                 </div>
               </div>
               <div className="h-px bg-border" />
+
+              {/* Add User button */}
+              <button onClick={() => { setProfileOpen(false); setSignupOpen(true); }}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-primary/10 text-primary font-semibold text-sm hover:bg-primary/20 transition-all">
+                <UserPlus className="w-4 h-4" /> Add User
+              </button>
+
               <div className="space-y-3">
                 <label className="text-sm font-semibold text-foreground/80">Appearance</label>
                 <div className="flex items-center gap-2 p-1 bg-muted rounded-xl">
@@ -169,6 +217,75 @@ export function HeaderNav() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Signup Dialog */}
+      <Dialog open={signupOpen} onOpenChange={setSignupOpen}>
+        <DialogContent className="max-w-md rounded-2xl border-2 p-0 flex flex-col max-h-[85vh]">
+          <DialogHeader className="px-6 pt-5 pb-3 border-b border-border shrink-0">
+            <DialogTitle className="text-lg font-bold capitalize flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-primary" /> Create User Account
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSignup} className="px-6 py-4 space-y-4 overflow-y-auto flex-1">
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-foreground/80 capitalize">Email Address</label>
+              <div className="relative">
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input type="email" value={signupEmail} onChange={e => { setSignupEmail(e.target.value); setSignupErrors(p => ({ ...p, email: "" })); }}
+                  placeholder="user@company.com"
+                  className={cn("premium-input pl-10", signupErrors.email && "border-destructive focus:ring-destructive/20 focus:border-destructive")} />
+              </div>
+              {signupErrors.email && <p className="text-xs text-destructive font-medium flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-destructive" />{signupErrors.email}</p>}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-foreground/80 capitalize">Password</label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input type={showPass ? "text" : "password"} value={signupPassword} onChange={e => { setSignupPassword(e.target.value); setSignupErrors(p => ({ ...p, password: "" })); }}
+                  placeholder="Min 6 characters"
+                  className={cn("premium-input pl-10 pr-10", signupErrors.password && "border-destructive focus:ring-destructive/20 focus:border-destructive")} />
+                <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {signupErrors.password && <p className="text-xs text-destructive font-medium flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-destructive" />{signupErrors.password}</p>}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-foreground/80 capitalize">Confirm Password</label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input type={showConf ? "text" : "password"} value={signupConfirm} onChange={e => { setSignupConfirm(e.target.value); setSignupErrors(p => ({ ...p, confirm: "" })); }}
+                  placeholder="Re-enter password"
+                  className={cn("premium-input pl-10 pr-10", signupErrors.confirm && "border-destructive focus:ring-destructive/20 focus:border-destructive")} />
+                <button type="button" onClick={() => setShowConf(!showConf)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  {showConf ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {signupErrors.confirm && <p className="text-xs text-destructive font-medium flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-destructive" />{signupErrors.confirm}</p>}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-foreground/80 capitalize flex items-center gap-1.5"><Shield className="w-3.5 h-3.5 text-primary" />Role</label>
+              <AnimatedDropdown
+                options={roles.map(r => ({ label: r, value: r }))}
+                value={signupRole}
+                onChange={v => { setSignupRole(v); setSignupErrors(p => ({ ...p, role: "" })); }}
+                placeholder="Select a role"
+                error={!!signupErrors.role}
+              />
+              {signupErrors.role && <p className="text-xs text-destructive font-medium flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-destructive" />{signupErrors.role}</p>}
+            </div>
+          </form>
+          <div className="px-6 py-4 border-t border-border shrink-0 bg-muted/30">
+            <button type="button" onClick={handleSignup} disabled={signupLoading}
+              className="w-full py-2.5 bg-primary text-primary-foreground font-bold text-sm rounded-xl shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60">
+              {signupLoading ? <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> : <>Create Account <ArrowRight className="w-4 h-4" /></>}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
