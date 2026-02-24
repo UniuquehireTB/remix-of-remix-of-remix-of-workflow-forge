@@ -1,9 +1,16 @@
 {
     "version": 2,
+    "functions": {
+        "api/server.js": {
+            "runtime": "nodejs20.x",
+            "memory": 1024,
+            "maxDuration": 25
+        }
+    },
     "rewrites": [
         {
             "source": "/api/(.*)",
-            "destination": "/api/index.cjs"
+            "destination": "/api/server.js"
         },
         {
             "source": "/((?!api/).*)",

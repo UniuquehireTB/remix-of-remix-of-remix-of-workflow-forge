@@ -17,6 +17,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Super simple status check
+app.get('/api/status', (req, res) => res.send('Backend is alive'));
+
 // Health check with detailed diagnostics
 app.get(['/api/health', '/health'], async (req, res) => {
     try {
