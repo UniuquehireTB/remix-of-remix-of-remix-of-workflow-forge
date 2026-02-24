@@ -8,54 +8,40 @@
   :root {
     --background: 210 40% 98%;
     --foreground: 222 47% 11%;
-
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
-
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-
     --primary: 221 83% 53%;
     --primary-foreground: 210 40% 98%;
-
     --secondary: 210 40% 96%;
     --secondary-foreground: 222 47% 11%;
-
     --muted: 210 40% 96%;
     --muted-foreground: 215 16% 47%;
-
     --accent: 210 40% 96%;
     --accent-foreground: 222 47% 11%;
-
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
-
     --border: 214 32% 91%;
     --input: 214 32% 91%;
     --ring: 221 83% 53%;
-
     --radius: 0.75rem;
-
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
     --info: 199 89% 48%;
     --info-foreground: 0 0% 100%;
-
     --chart-1: 221 83% 53%;
     --chart-2: 142 71% 45%;
     --chart-3: 38 92% 50%;
     --chart-4: 280 67% 60%;
     --chart-5: 0 84% 60%;
-
     --shadow-sm: 0 1px 2px 0 hsl(221 83% 53% / 0.03);
     --shadow-md: 0 4px 6px -1px hsl(221 83% 53% / 0.06), 0 2px 4px -2px hsl(221 83% 53% / 0.04);
     --shadow-lg: 0 10px 25px -5px hsl(221 83% 53% / 0.08), 0 4px 6px -4px hsl(221 83% 53% / 0.03);
     --shadow-xl: 0 20px 50px -10px hsl(221 83% 53% / 0.12);
     --shadow-glow: 0 0 30px hsl(221 83% 53% / 0.15);
-
-    /* Sidebar variables kept for compatibility */
     --sidebar-background: 222 47% 6%;
     --sidebar-foreground: 220 14% 75%;
     --sidebar-primary: 221 83% 53%;
@@ -70,32 +56,23 @@
   .dark {
     --background: 222 47% 6%;
     --foreground: 210 40% 96%;
-
     --card: 222 47% 9%;
     --card-foreground: 210 40% 96%;
-
     --popover: 222 47% 9%;
     --popover-foreground: 210 40% 96%;
-
     --primary: 217 91% 60%;
     --primary-foreground: 222 47% 6%;
-
     --secondary: 215 28% 17%;
     --secondary-foreground: 210 40% 96%;
-
     --muted: 215 28% 14%;
     --muted-foreground: 215 16% 57%;
-
     --accent: 215 28% 17%;
     --accent-foreground: 210 40% 96%;
-
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 100%;
-
     --border: 215 28% 17%;
     --input: 215 28% 17%;
     --ring: 217 91% 60%;
-
     --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.2);
     --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.3), 0 2px 4px -2px hsl(0 0% 0% / 0.2);
     --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.4), 0 4px 6px -4px hsl(0 0% 0% / 0.3);
@@ -108,17 +85,14 @@
   * {
     @apply border-border;
   }
-
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   }
-
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
     @apply font-bold tracking-tight;
   }
-
   code, pre {
     font-family: 'JetBrains Mono', monospace;
   }
@@ -129,37 +103,37 @@
     @apply bg-clip-text text-transparent;
     background-image: linear-gradient(135deg, hsl(221, 83%, 53%), hsl(199, 89%, 48%));
   }
-
   .glass {
     @apply bg-card/80 backdrop-blur-xl border border-border/50;
   }
-
   .card-hover {
     @apply transition-all duration-300 hover:shadow-lg hover:border-primary/20 hover:-translate-y-0.5;
   }
-
   .animate-fade-in {
     animation: fadeIn 0.4s ease-out;
   }
-
   .animate-slide-up {
     animation: slideUp 0.5s ease-out both;
   }
-
   .animate-slide-in-right {
     animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
-
   .animate-slide-out-right {
     animation: slideOutRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
-
   .animate-scale-in {
     animation: scaleIn 0.3s ease-out both;
   }
 
   .premium-input {
-    @apply w-full px-4 py-3 border-2 border-input rounded-xl bg-background text-sm font-medium
+    @apply w-full px-3.5 py-2.5 border-2 border-input rounded-xl bg-background text-sm font-medium
+    transition-all duration-200
+    focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary
+    placeholder:text-muted-foreground/50;
+  }
+
+  .premium-input-sm {
+    @apply w-full px-3 py-2 border-2 border-input rounded-xl bg-background text-sm font-medium
     transition-all duration-200
     focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary
     placeholder:text-muted-foreground/50;
@@ -178,7 +152,7 @@
   }
 
   .premium-select {
-    @apply w-full px-4 py-3 border-2 border-input rounded-xl bg-background text-sm font-medium
+    @apply w-full px-3.5 py-2.5 border-2 border-input rounded-xl bg-background text-sm font-medium
     transition-all duration-200 appearance-none cursor-pointer
     focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary;
   }
@@ -188,41 +162,33 @@
   from { opacity: 0; }
   to { opacity: 1; }
 }
-
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
 }
-
 @keyframes slideInRight {
   from { opacity: 0; transform: translateX(100%); }
   to { opacity: 1; transform: translateX(0); }
 }
-
 @keyframes slideOutRight {
   from { opacity: 1; transform: translateX(0); }
   to { opacity: 0; transform: translateX(100%); }
 }
-
 @keyframes scaleIn {
   from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
-
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
   @apply bg-border rounded-full;
 }
-
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-muted-foreground/30;
 }

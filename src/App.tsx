@@ -7,8 +7,6 @@ import Projects from "./pages/Projects";
 import Tickets from "./pages/Tickets";
 import Notes from "./pages/Notes";
 import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import ForgotPassword from "./pages/ForgotPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -21,8 +19,6 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/" element={<Projects />} />
           <Route path="/tickets" element={<Tickets />} />
           <Route path="/notes" element={<Notes />} />

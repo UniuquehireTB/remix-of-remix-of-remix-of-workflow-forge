@@ -82,8 +82,8 @@ const Projects = () => {
 
   return (
     <AppLayout title="Projects" subtitle="Manage your organization's projects">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
-        <SearchBar value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Search projects..." className="w-full sm:max-w-sm" />
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <SearchBar value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Search projects..." className="max-w-sm" />
         <Button onClick={openCreate} className="gap-2 rounded-xl shadow-lg shadow-primary/25 px-5 shrink-0">
           <Plus className="w-4 h-4" />
           <span>New Project</span>
@@ -153,7 +153,7 @@ const Projects = () => {
       <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} pageSize={PAGE_SIZE} />
 
       <CrudDialog open={dialogOpen} onClose={() => setDialogOpen(false)} title={editingId ? "Edit Project" : "Add Project"} onSave={handleSave}>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField label="Project Name" icon={FolderKanban} required error={errors.name}>
             <input className={cn("premium-input", errors.name && "border-destructive focus:ring-destructive/20 focus:border-destructive")}
               placeholder="Enter project name..." value={editData.name || ""} onChange={e => { setEditData(d => ({ ...d, name: e.target.value })); setErrors(p => ({ ...p, name: "" })); }} />
@@ -164,7 +164,7 @@ const Projects = () => {
           </FormField>
         </div>
         <FormField label="Description" icon={FileText} required error={errors.description}>
-          <textarea className={cn("premium-input min-h-[100px] resize-none", errors.description && "border-destructive focus:ring-destructive/20 focus:border-destructive")}
+          <textarea className={cn("premium-input min-h-[80px] resize-none", errors.description && "border-destructive focus:ring-destructive/20 focus:border-destructive")}
             placeholder="Brief project description..." rows={3} value={editData.description || ""} onChange={e => { setEditData(d => ({ ...d, description: e.target.value })); setErrors(p => ({ ...p, description: "" })); }} />
         </FormField>
         <FormField label="Members" icon={Users}>
