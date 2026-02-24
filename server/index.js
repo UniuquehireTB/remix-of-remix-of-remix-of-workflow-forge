@@ -16,6 +16,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Health check to trigger DB sync on Vercel
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', message: 'Server is running', database: isDbInitialized ? 'initialized' : 'initializing' });
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
@@ -23,6 +28,27 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/notifications', notificationRoutes);
+
+// Database Initialization Middleware for Serverless
+let isDbInitialized = false;
+const initDb = async (req, res, next) => {
+    if (!isDbInitialized) {
+        try {
+            await connectDB();
+            await sequelize.sync({ alter: true });
+            console.log('Database synced successfully in serverless environment');
+            isDbInitialized = true;
+        } catch (error) {
+            console.error('Database initialization failed:', error);
+            return res.status(500).json({ message: 'Database initialization failed' });
+        }
+    }
+    next();
+};
+
+if (process.env.VERCEL) {
+    app.use(initDb);
+}
 
 // Database Sync and Server Listen
 const PORT = process.env.PORT || 5000;
@@ -32,6 +58,7 @@ const startServer = async () => {
         await connectDB();
         await sequelize.sync({ alter: true });
         console.log('Database synced');
+        isDbInitialized = true;
 
         if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
             app.listen(PORT, () => {
