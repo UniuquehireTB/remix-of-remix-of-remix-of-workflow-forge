@@ -1,4 +1,6 @@
-const API_URL = 'http://localhost:5000/api';
+// In production (Vercel), frontend and backend share the same domain.
+// In development, the backend runs on localhost:5000.
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 export const apiService = {
     // Generic request helper that includes the JWT token
