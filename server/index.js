@@ -17,26 +17,47 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Ensure DB is connected before handling any request (lazy, cached connection)
+let dbConnected = false;
+app.use(async (req, res, next) => {
+    if (!dbConnected) {
+        try {
+            await connectDB();
+            dbConnected = true;
+        } catch (error) {
+            console.error('DB connection failed:', error.message);
+            return res.status(500).json({
+                error: 'Database connection failed',
+                message: error.message,
+                hint: 'Check DATABASE_URL environment variable in Vercel dashboard'
+            });
+        }
+    }
+    next();
+});
+
 // Super simple status check
-app.get('/api/status', (req, res) => res.send('Backend is alive'));
+app.get('/api/status', (req, res) => res.json({
+    status: 'Backend is alive',
+    db: dbConnected ? 'connected' : 'not connected',
+    env: process.env.NODE_ENV,
+    hasDbUrl: !!process.env.DATABASE_URL
+}));
 
 // Health check with detailed diagnostics
 app.get(['/api/health', '/health'], async (req, res) => {
     try {
         await connectDB();
-        await sequelize.sync({ alter: true });
         res.json({
             status: 'ok',
-            database: 'connected and synced',
-            url: process.env.DATABASE_URL ? 'URL detected' : 'URL missing',
+            database: 'connected',
+            url: process.env.DATABASE_URL ? 'URL detected' : 'URL MISSING - add to Vercel env vars!',
             env: process.env.NODE_ENV,
-            path: req.path
         });
     } catch (error) {
         res.status(500).json({
             status: 'error',
             message: error.message,
-            stack: process.env.NODE_ENV === 'production' ? null : error.stack
         });
     }
 });
@@ -49,7 +70,7 @@ app.use('/api/tickets', ticketRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/notifications', notificationRoutes);
 
-// Database Sync and Server Listen
+// Local dev server startup
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
@@ -57,19 +78,17 @@ const startServer = async () => {
         await connectDB();
         await sequelize.sync({ alter: true });
         console.log('Database synced');
-
         app.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);
         });
     } catch (error) {
-        console.error('Failed to start server:', error);
+        console.error('Failed to start server:', error.message);
     }
 };
 
-// Vercel handles the listening; we only start server if run directly (local dev)
+// Vercel runs this as a module — only listen locally
 if (require.main === module) {
     startServer();
 }
 
 module.exports = app;
-

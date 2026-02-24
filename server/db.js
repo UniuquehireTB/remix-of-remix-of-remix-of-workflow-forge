@@ -29,8 +29,8 @@ const connectDB = async () => {
         await sequelize.authenticate();
         console.log('PostgreSQL Database connected successfully via Sequelize.');
     } catch (error) {
-        console.error('Unable to connect to the database:', error);
-        process.exit(1);
+        console.error('Unable to connect to the database:', error.message);
+        throw error; // Let the caller handle it — never call process.exit in serverless!
     }
 };
 
