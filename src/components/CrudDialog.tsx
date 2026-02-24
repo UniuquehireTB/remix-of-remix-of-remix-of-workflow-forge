@@ -16,14 +16,16 @@ interface CrudDialogProps {
   onSave: () => void;
   children: ReactNode;
   saveLabel?: string;
+  size?: "sm" | "md" | "lg";
 }
 
-export function CrudDialog({ open, onClose, title, onSave, children, saveLabel = "Save Changes" }: CrudDialogProps) {
+export function CrudDialog({ open, onClose, title, onSave, children, saveLabel = "Save Changes", size = "md" }: CrudDialogProps) {
+  const maxW = size === "lg" ? "max-w-2xl" : size === "sm" ? "max-w-sm" : "max-w-lg";
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl border-2 p-0">
+      <DialogContent className={`${maxW} max-h-[85vh] overflow-y-auto rounded-2xl border-2 p-0`}>
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-border">
-          <DialogTitle className="text-xl font-bold">{title}</DialogTitle>
+          <DialogTitle className="text-xl font-bold capitalize">{title}</DialogTitle>
         </DialogHeader>
         <div className="space-y-5 px-6 py-5">{children}</div>
         <DialogFooter className="px-6 pb-6 pt-2 gap-2">
@@ -53,7 +55,7 @@ export function DeleteDialog({ open, onClose, onConfirm, itemName }: DeleteDialo
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent className="max-w-sm rounded-2xl border-2 border-destructive/20">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-lg">
+          <DialogTitle className="flex items-center gap-2 text-lg capitalize">
             <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
               <AlertTriangle className="w-5 h-5 text-destructive" />
             </div>

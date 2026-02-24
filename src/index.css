@@ -166,7 +166,15 @@
   }
 
   .premium-label {
-    @apply text-xs font-semibold text-foreground/80 uppercase tracking-wider mb-2 flex items-center gap-1.5;
+    @apply text-sm font-semibold text-foreground/80 capitalize mb-1.5 flex items-center gap-1.5;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 
   .premium-select {
