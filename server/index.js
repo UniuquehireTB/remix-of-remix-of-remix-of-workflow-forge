@@ -18,7 +18,7 @@ app.use(cors());
 app.use(express.json());
 
 // Health check with detailed diagnostics
-app.get('/api/health', async (req, res) => {
+app.get(['/api/health', '/health'], async (req, res) => {
     try {
         await connectDB();
         await sequelize.sync({ alter: true });
@@ -27,7 +27,8 @@ app.get('/api/health', async (req, res) => {
             status: 'ok',
             database: 'connected and synced',
             url: process.env.DATABASE_URL ? 'URL detected' : 'URL missing',
-            env: process.env.NODE_ENV
+            env: process.env.NODE_ENV,
+            path: req.path
         });
     } catch (error) {
         res.status(500).json({
