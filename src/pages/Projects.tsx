@@ -13,7 +13,9 @@ import { projectStatusColors } from "@/lib/data";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import { projectService } from "@/services/authService";
+import { projectService, authService } from "@/services/authService";
+
+const CAN_MANAGE_PROJECTS = ['Architect', 'Manager', 'System Architect', 'Senior Developer'];
 
 const PAGE_SIZE = 10;
 
@@ -42,6 +44,8 @@ const Projects = () => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const { toast } = useToast();
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const currentUser = authService.getCurrentUser();
+  const canManage = CAN_MANAGE_PROJECTS.includes(currentUser?.role || '');
 
   const fetchProjects = async () => {
     setLoading(true);
@@ -127,10 +131,12 @@ const Projects = () => {
               {pagination.itemsLeft} items left
             </Badge>
           )}
-          <Button onClick={openCreate} className="gap-2 rounded-xl shadow-lg shadow-primary/25 px-5 shrink-0">
-            <Plus className="w-4 h-4" />
-            <span>Create Project</span>
-          </Button>
+          {canManage && (
+            <Button onClick={openCreate} className="gap-2 rounded-xl shadow-lg shadow-primary/25 px-5 shrink-0">
+              <Plus className="w-4 h-4" />
+              <span>Create Project</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -167,23 +173,25 @@ const Projects = () => {
                         </p>
                       </div>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-muted transition-colors opacity-0 group-hover:opacity-100">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="rounded-xl bg-popover border border-border shadow-xl z-50">
-                        <DropdownMenuItem onClick={() => openEdit(project)} className="cursor-pointer">
-                          <Pencil className="w-3.5 h-3.5 mr-2" />
-                          Edit Project
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setDeleteTarget(project)} className="text-destructive cursor-pointer">
-                          <Trash2 className="w-3.5 h-3.5 mr-2" />
-                          Delete Project
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {canManage && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-muted transition-colors opacity-0 group-hover:opacity-100">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="rounded-xl bg-popover border border-border shadow-xl z-50">
+                          <DropdownMenuItem onClick={() => openEdit(project)} className="cursor-pointer">
+                            <Pencil className="w-3.5 h-3.5 mr-2" />
+                            Edit Project
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setDeleteTarget(project)} className="text-destructive cursor-pointer">
+                            <Trash2 className="w-3.5 h-3.5 mr-2" />
+                            Delete Project
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
 
                   <p className="text-sm text-muted-foreground mb-6 line-clamp-3 min-h-[3rem]">{project.description}</p>

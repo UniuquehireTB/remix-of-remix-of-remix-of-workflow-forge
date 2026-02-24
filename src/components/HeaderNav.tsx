@@ -282,12 +282,7 @@ export function HeaderNav() {
                         </div>
                         <p className={cn("text-sm mt-1 leading-tight", !n.isRead ? "font-bold text-foreground" : "font-medium text-muted-foreground")}>{n.title}</p>
                         <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{n.message}</p>
-                        {route && (
-                          <p className="text-[10px] font-bold text-primary mt-2 flex items-center gap-1">
-                            <ArrowRight className="w-3 h-3" />
-                            View {n.type}
-                          </p>
-                        )}
+
                       </div>
                     </div>
                   </motion.div>
