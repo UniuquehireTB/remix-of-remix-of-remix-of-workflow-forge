@@ -3,6 +3,7 @@ const cors = require('cors');
 const { connectDB, sequelize } = require('./db');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
+require('./models'); // Required to load models and associations for sync
 require('dotenv').config();
 
 const projectRoutes = require('./routes/projectRoutes');

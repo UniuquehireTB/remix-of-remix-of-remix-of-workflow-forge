@@ -1,8 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @layer base {
   :root {
@@ -85,15 +85,24 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   }
-  h1, h2, h3, h4, h5, h6 {
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
     @apply font-bold tracking-tight;
   }
-  code, pre {
+
+  code,
+  pre {
     font-family: 'JetBrains Mono', monospace;
   }
 }
@@ -103,40 +112,41 @@
     @apply bg-clip-text text-transparent;
     background-image: linear-gradient(135deg, hsl(221, 83%, 53%), hsl(199, 89%, 48%));
   }
+
   .glass {
     @apply bg-card/80 backdrop-blur-xl border border-border/50;
   }
+
   .card-hover {
     @apply transition-all duration-300 hover:shadow-lg hover:border-primary/20 hover:-translate-y-0.5;
   }
+
   .animate-fade-in {
     animation: fadeIn 0.4s ease-out;
   }
+
   .animate-slide-up {
     animation: slideUp 0.5s ease-out both;
   }
+
   .animate-slide-in-right {
     animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
+
   .animate-slide-out-right {
     animation: slideOutRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
+
   .animate-scale-in {
     animation: scaleIn 0.3s ease-out both;
   }
 
   .premium-input {
-    @apply w-full px-3.5 py-2.5 border-2 border-input rounded-xl bg-background text-sm font-medium
-    transition-all duration-200
-    focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary
-    placeholder:text-muted-foreground/50;
+    @apply w-full px-3.5 py-2.5 border-2 border-input rounded-xl bg-background text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-muted-foreground/50;
   }
 
   .premium-input-sm {
-    @apply w-full px-3 py-2 border-2 border-input rounded-xl bg-background text-sm font-medium
-    transition-all duration-200
-    focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary
-    placeholder:text-muted-foreground/50;
+    @apply w-full px-3 py-2 border-2 border-input rounded-xl bg-background text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-muted-foreground/50;
   }
 
   .premium-label {
@@ -147,48 +157,87 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
 
   .premium-select {
-    @apply w-full px-3.5 py-2.5 border-2 border-input rounded-xl bg-background text-sm font-medium
-    transition-all duration-200 appearance-none cursor-pointer
-    focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary;
+    @apply w-full px-3.5 py-2.5 border-2 border-input rounded-xl bg-background text-sm font-medium transition-all duration-200 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary;
   }
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
+
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
+
 @keyframes slideInRight {
-  from { opacity: 0; transform: translateX(100%); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
+
 @keyframes slideOutRight {
-  from { opacity: 1; transform: translateX(0); }
-  to { opacity: 0; transform: translateX(100%); }
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
 }
+
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   @apply bg-border rounded-full;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-muted-foreground/30;
 }
