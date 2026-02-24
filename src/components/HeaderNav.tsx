@@ -107,6 +107,27 @@ export function HeaderNav() {
     }
   };
 
+  const getNotificationRoute = (type: string): string | null => {
+    const t = type?.toLowerCase();
+    if (t?.includes('project')) return '/';
+    if (t?.includes('ticket')) return '/tickets';
+    if (t?.includes('note')) return '/notes';
+    return null;
+  };
+
+  const handleNotificationClick = async (n: NotificationData) => {
+    // Mark as read if unread
+    if (!n.isRead) {
+      await handleMarkAsRead(n.id);
+    }
+    // Navigate based on type
+    const route = getNotificationRoute(n.type);
+    if (route) {
+      setNotifOpen(false);
+      navigate(route);
+    }
+  };
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs: Record<string, string> = {};
@@ -238,31 +259,40 @@ export function HeaderNav() {
                   <p className="text-sm font-bold">No notifications yet</p>
                   <p className="text-xs">We'll notify you when something happens</p>
                 </div>
-              ) : notifications.map((n, i) => (
-                <motion.div
-                  key={n.id}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  onClick={() => !n.isRead && handleMarkAsRead(n.id)}
-                  className={cn(
-                    "p-4 rounded-xl border transition-all cursor-pointer hover:shadow-md relative group",
-                    !n.isRead ? "bg-primary/5 border-primary/20" : "bg-card border-border hover:bg-muted/30"
-                  )}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={cn("w-2 h-2 rounded-full mt-2 shrink-0 transition-colors", !n.isRead ? "bg-primary" : "bg-transparent")} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className={cn("text-xs font-black uppercase tracking-widest", !n.isRead ? "text-primary" : "text-muted-foreground")}>{n.type}</p>
-                        <p className="text-[10px] text-muted-foreground/60 font-medium">{formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}</p>
+              ) : notifications.map((n, i) => {
+                const route = getNotificationRoute(n.type);
+                return (
+                  <motion.div
+                    key={n.id}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    onClick={() => handleNotificationClick(n)}
+                    className={cn(
+                      "p-4 rounded-xl border transition-all cursor-pointer hover:shadow-md relative group",
+                      !n.isRead ? "bg-primary/5 border-primary/20" : "bg-card border-border hover:bg-muted/30"
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={cn("w-2 h-2 rounded-full mt-2 shrink-0 transition-colors", !n.isRead ? "bg-primary" : "bg-transparent")} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className={cn("text-xs font-black uppercase tracking-widest", !n.isRead ? "text-primary" : "text-muted-foreground")}>{n.type}</p>
+                          <p className="text-[10px] text-muted-foreground/60 font-medium">{formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}</p>
+                        </div>
+                        <p className={cn("text-sm mt-1 leading-tight", !n.isRead ? "font-bold text-foreground" : "font-medium text-muted-foreground")}>{n.title}</p>
+                        <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{n.message}</p>
+                        {route && (
+                          <p className="text-[10px] font-bold text-primary mt-2 flex items-center gap-1">
+                            <ArrowRight className="w-3 h-3" />
+                            View {n.type}
+                          </p>
+                        )}
                       </div>
-                      <p className={cn("text-sm mt-1 leading-tight", !n.isRead ? "font-bold text-foreground" : "font-medium text-muted-foreground")}>{n.title}</p>
-                      <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{n.message}</p>
                     </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </div>
           </motion.div>
         )}
@@ -288,15 +318,17 @@ export function HeaderNav() {
               </div>
               <div className="h-px bg-border" />
 
-              {/* Add User button */}
-              <button onClick={() => {
-                setProfileOpen(false);
-                setSignupOpen(true);
-                setSignupErrors({});
-              }}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-primary/10 text-primary font-semibold text-sm hover:bg-primary/20 transition-all">
-                <UserPlus className="w-4 h-4" /> Add User
-              </button>
+              {/* Add User button — Architect only */}
+              {currentUser?.role === 'Architect' && (
+                <button onClick={() => {
+                  setProfileOpen(false);
+                  setSignupOpen(true);
+                  setSignupErrors({});
+                }}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-primary/10 text-primary font-semibold text-sm hover:bg-primary/20 transition-all">
+                  <UserPlus className="w-4 h-4" /> Add User
+                </button>
+              )}
 
               <div className="space-y-3">
                 <label className="text-sm font-semibold text-foreground/80">Appearance</label>
