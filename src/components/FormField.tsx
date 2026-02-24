@@ -13,8 +13,8 @@ interface FormFieldProps {
 
 export function FormField({ label, icon: Icon, error, required, children, className }: FormFieldProps) {
   return (
-    <div className={cn("space-y-2", className)}>
-      <label className="premium-label">
+    <div className={cn("space-y-1.5", className)}>
+      <label className="text-sm font-semibold text-foreground/80 flex items-center gap-1.5 capitalize">
         {Icon && <Icon className="w-3.5 h-3.5 text-primary" />}
         {label}
         {required && <span className="text-destructive">*</span>}
