@@ -67,6 +67,10 @@ const startServer = async () => {
     }
 };
 
-startServer();
+// Vercel handles the listening; we only start server if run directly (local dev)
+if (require.main === module) {
+    startServer();
+}
 
 module.exports = app;
+
