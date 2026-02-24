@@ -50,27 +50,6 @@ app.use('/api/tickets', ticketRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/notifications', notificationRoutes);
 
-// Database Initialization Middleware for Serverless
-let isDbInitialized = false;
-const initDb = async (req, res, next) => {
-    if (!isDbInitialized) {
-        try {
-            await connectDB();
-            await sequelize.sync({ alter: true });
-            console.log('Database synced successfully in serverless environment');
-            isDbInitialized = true;
-        } catch (error) {
-            console.error('Database initialization failed:', error);
-            return res.status(500).json({ message: 'Database initialization failed' });
-        }
-    }
-    next();
-};
-
-if (process.env.VERCEL) {
-    app.use(initDb);
-}
-
 // Database Sync and Server Listen
 const PORT = process.env.PORT || 5000;
 
@@ -79,21 +58,15 @@ const startServer = async () => {
         await connectDB();
         await sequelize.sync({ alter: true });
         console.log('Database synced');
-        isDbInitialized = true;
 
-        if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-            app.listen(PORT, () => {
-                console.log(`Server running on port ${PORT}`);
-            });
-        }
+        app.listen(PORT, () => {
+            console.log(`Server running on port ${PORT}`);
+        });
     } catch (error) {
         console.error('Failed to start server:', error);
     }
 };
 
-// Only call startServer if not being imported as a module (e.g., by Vercel)
-if (require.main === module) {
-    startServer();
-}
+startServer();
 
 module.exports = app;
