@@ -44,17 +44,6 @@ app.get('/api/status', (req, res) => res.json({
     hasDbUrl: !!process.env.DATABASE_URL
 }));
 
-// Temporary Migration Endpoint to fix schema in Production
-app.get('/api/migrate', async (req, res) => {
-    try {
-        await connectDB();
-        await sequelize.sync({ alter: true });
-        res.json({ status: 'success', message: 'Database schema synced successfully' });
-    } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
-    }
-});
-
 // Health check with detailed diagnostics
 app.get(['/api/health', '/health'], async (req, res) => {
     try {

@@ -11,65 +11,38 @@ let sequelize;
 
 if (isProduction) {
     // ── PRODUCTION ─────────────────────────────────────────────────
-    // Uses DATABASE_URL (Neon or Office Server) set in the Vercel dashboard.
+    // Uses Neon DATABASE_URL set in the Vercel dashboard.
     if (!process.env.DATABASE_URL) {
         throw new Error('[db.js] DATABASE_URL is required in production but was not set.');
     }
-
-    const useSSL = !process.env.DATABASE_URL.includes('sslmode=disable');
-    console.log(`[db.js] 🌐 Connecting to Database (Production)... SSL: ${useSSL ? 'Enabled' : 'Disabled'}`);
-
+    console.log('[db.js] 🌐 Connecting to Neon (production)...');
     sequelize = new Sequelize(process.env.DATABASE_URL, {
         dialect: 'postgres',
         dialectModule: pg,
         logging: false,
-        ...(useSSL && {
-            dialectOptions: {
-                ssl: {
-                    require: true,
-                    rejectUnauthorized: false,
-                },
+        dialectOptions: {
+            ssl: {
+                require: true,
+                rejectUnauthorized: false,
             },
-        }),
+        },
     });
 } else {
     // ── DEVELOPMENT ────────────────────────────────────────────────
-    // Check if a full DATABASE_URL is provided in .env
-    if (process.env.DATABASE_URL) {
-        const useSSL = process.env.DATABASE_URL.includes('sslmode=require') ||
-            (!process.env.DATABASE_URL.includes('sslmode=disable') && process.env.DATABASE_URL.includes('neon.tech'));
-
-        console.log(`[db.js] 🛠️  Connecting to Database (URL Mode)... SSL: ${useSSL ? 'Enabled' : 'Disabled'}`);
-
-        sequelize = new Sequelize(process.env.DATABASE_URL, {
+    // Uses local PostgreSQL credentials from server/.env
+    console.log('[db.js] 🛠️  Connecting to local PostgreSQL (development)...');
+    sequelize = new Sequelize(
+        process.env.DB_NAME,
+        process.env.DB_USER,
+        process.env.DB_PASSWORD,
+        {
+            host: process.env.DB_HOST || 'localhost',
+            port: process.env.DB_PORT || 5432,
             dialect: 'postgres',
             dialectModule: pg,
             logging: false,
-            ...(useSSL && {
-                dialectOptions: {
-                    ssl: {
-                        require: true,
-                        rejectUnauthorized: false,
-                    },
-                },
-            }),
-        });
-    } else {
-        // Fallback to individual credentials from .env
-        console.log('[db.js] 🛠️  Connecting to local PostgreSQL (Individual Credentials)...');
-        sequelize = new Sequelize(
-            process.env.DB_NAME,
-            process.env.DB_USER,
-            process.env.DB_PASSWORD,
-            {
-                host: process.env.DB_HOST || 'localhost',
-                port: process.env.DB_PORT || 5432,
-                dialect: 'postgres',
-                dialectModule: pg,
-                logging: false,
-            }
-        );
-    }
+        }
+    );
 }
 
 const connectDB = async () => {
