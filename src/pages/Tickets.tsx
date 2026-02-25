@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/AppLayout";
-import { Plus, Pencil, Trash2, MoreHorizontal, Bug, AlertCircle, Calendar, FileText, Users, ArrowRight, MessageSquare, Eye, Check, X } from "lucide-react";
+import { Plus, Pencil, Trash2, MoreHorizontal, Bug, AlertCircle, Calendar, FileText, Users, ArrowRight, MessageSquare, Eye, Check, X, UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -70,9 +70,9 @@ const Tickets = () => {
   const [priorityFilter, setPriorityFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("Open");
   const [projectFilter, setProjectFilter] = useState<any>("All");
-  // Everyone (privileged or not) starts seeing only their own assigned tickets
+  // Privileged roles see all members' tickets by default; others see only their own
   const [employeeFilter, setEmployeeFilter] = useState<any>(
-    currentUser?.id?.toString() ?? "All"
+    isPrivileged ? "All" : (currentUser?.id?.toString() ?? "All")
   );
   const [startDateFilter, setStartDateFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
@@ -355,7 +355,7 @@ const Tickets = () => {
           <div className="flex flex-wrap items-center gap-3 flex-1">
             {/* Member filter: only visible to privileged roles */}
             {isPrivileged && (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <div className="relative min-w-[170px] max-w-[220px]">
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 z-10 pointer-events-none">
                     <Users className="w-4 h-4" />
@@ -373,12 +373,30 @@ const Tickets = () => {
                     triggerClassName="pl-9 border-border/80 !border-2 !rounded-lg h-9 bg-background text-xs font-semibold shadow-none"
                   />
                 </div>
-                {/* Reset button — appears only when filter has changed from own tickets */}
-                {employeeFilter !== (currentUser?.id?.toString() ?? "All") && (
+
+                {/* My Tickets Button — only for privileged roles */}
+                <button
+                  onClick={() => { setEmployeeFilter(currentUser?.id?.toString() ?? "All"); setPage(1); }}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 h-9 rounded-lg text-[11px] font-bold transition-all border-2",
+                    employeeFilter === currentUser?.id?.toString()
+                      ? "bg-primary/10 border-primary text-primary"
+                      : "bg-background border-border/80 text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                  )}
+                >
+                  <UserIcon className="w-3.5 h-3.5" />
+                  <span className="whitespace-nowrap">My Tickets</span>
+                  {employeeFilter === currentUser?.id?.toString() && (
+                    <motion.div layoutId="activeDot" className="w-1 h-1 rounded-full bg-primary" />
+                  )}
+                </button>
+
+                {/* Clear/Reset to All button — appears when not showing All Members */}
+                {employeeFilter !== "All" && (
                   <button
-                    onClick={() => { setEmployeeFilter(currentUser?.id?.toString() ?? "All"); setPage(1); }}
-                    title="Reset to my tickets"
-                    className="flex items-center justify-center w-7 h-7 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive transition-colors shrink-0"
+                    onClick={() => { setEmployeeFilter("All"); setPage(1); }}
+                    title="Show All Members"
+                    className="flex items-center justify-center w-7 h-7 rounded-lg bg-muted/50 hover:bg-muted text-muted-foreground transition-colors shrink-0 border border-border/40"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
