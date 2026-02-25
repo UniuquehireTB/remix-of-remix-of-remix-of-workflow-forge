@@ -233,7 +233,7 @@ const Tickets = () => {
           <table className="w-full text-sm min-w-[1100px]">
             <thead>
               <tr className="bg-muted/30">
-                {["ID", "Title", "Description", "Type", "Priority", "Status", "Due Date", "Assignees", "Remarks", ""].map(h => (
+                {["ID", "Title", "Description", "Type", "Priority", "Status", "Due Date", "Assignees", "Remarks", "Actions"].map(h => (
                   <th key={h} className="text-left py-3.5 px-4 font-semibold text-xs tracking-wide text-muted-foreground capitalize">{h}</th>
                 ))}
               </tr>
@@ -254,7 +254,7 @@ const Tickets = () => {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: i * 0.03 }}
-                    className="border-t border-border/50 hover:bg-primary/[0.02] transition-colors cursor-pointer"
+                    className="group border-t border-border/50 hover:bg-primary/[0.02] transition-colors cursor-pointer"
                     onClick={() => setDescriptionTarget(t)}
                   >
                     <td className="py-3.5 px-4 font-mono text-xs text-primary font-bold whitespace-nowrap">{t.ticketId}</td>
@@ -325,7 +325,7 @@ const Tickets = () => {
                     <td className="py-3.5 px-4" onClick={e => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted transition-colors opacity-0 group-hover:opacity-100">
+                          <button className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted transition-colors">
                             <MoreHorizontal className="w-4 h-4" />
                           </button>
                         </DropdownMenuTrigger>
