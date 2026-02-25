@@ -4,7 +4,9 @@ const { Op } = require('sequelize');
 
 const getAllTickets = async (req, res) => {
     try {
-        const { search, type, priority, status, projectId, startDate, endDate, assigneeId, page = 1, limit = 10 } = req.query;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const { search, type, priority, status, projectId, startDate, endDate, assigneeId } = req.query;
         const offset = (page - 1) * limit;
 
         const whereClause = {
@@ -20,20 +22,34 @@ const getAllTickets = async (req, res) => {
             ...(status && { status }),
             ...(projectId && projectId !== 'undefined' && projectId !== 'All' && {
                 projectId: projectId === 'null' ? null : projectId
-            }),
-            ...(startDate && { startDate: { [Op.gte]: new Date(startDate) } }),
-            ...(endDate && { endDate: { [Op.lte]: new Date(endDate) } })
+            })
         };
 
+        // Date range filtering
+        if (startDate && startDate !== 'null') {
+            const sDate = new Date(startDate);
+            if (!isNaN(sDate.getTime())) {
+                whereClause.startDate = { [Op.gte]: sDate };
+            }
+        }
+        if (endDate && endDate !== 'null') {
+            const eDate = new Date(endDate);
+            if (!isNaN(eDate.getTime())) {
+                whereClause.endDate = { [Op.lte]: eDate };
+            }
+        }
+
         // Visibility Logic: 
-        // 1. Architect sees all
+        // 1. Architect and Manager see all
         // 2. Others only see tickets for projects they are members of
-        if (req.user.role !== 'Architect') {
+        const elevatedRoles = ['Architect', 'Manager', 'System Architect', 'Technical Analyst'];
+        if (!elevatedRoles.includes(req.user.role)) {
             const userProjectIds = await ProjectMember.findAll({
                 where: { userId: req.user.id },
                 attributes: ['projectId']
             });
-            const projectIds = userProjectIds.map(pm => pm.projectId);
+            const projectIds = userProjectIds.map(pm => pm.projectId).filter(id => id != null);
+
             whereClause[Op.and] = [
                 {
                     [Op.or]: [
@@ -46,8 +62,9 @@ const getAllTickets = async (req, res) => {
 
         const { count, rows } = await Ticket.findAndCountAll({
             where: whereClause,
-            limit: parseInt(limit),
-            offset: parseInt(offset),
+            limit: limit,
+            offset: offset,
+            distinct: true, // Crucial when including collections with pagination
             include: [
                 { model: Project, as: 'project', attributes: ['id', 'name'] },
                 {
@@ -55,7 +72,7 @@ const getAllTickets = async (req, res) => {
                     as: 'assignees',
                     attributes: ['id', 'username', 'role'],
                     through: { attributes: [] },
-                    ...(assigneeId && { where: { id: assigneeId } })
+                    ...(assigneeId && assigneeId !== 'All' && { where: { id: assigneeId } })
                 }
             ],
             order: [['createdAt', 'DESC']]
@@ -65,15 +82,15 @@ const getAllTickets = async (req, res) => {
             data: rows,
             pagination: {
                 totalItems: count,
-                currentPage: parseInt(page),
-                itemsPerPage: parseInt(limit),
+                currentPage: page,
+                itemsPerPage: limit,
                 itemsLeft: Math.max(0, count - (page * limit)),
                 totalPages: Math.ceil(count / limit)
             }
         });
     } catch (error) {
         console.error('Error fetching tickets:', error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({ message: 'Server error', details: error.message });
     }
 };
 
