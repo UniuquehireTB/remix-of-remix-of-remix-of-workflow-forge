@@ -15,9 +15,10 @@ interface MemberSelectorProps {
     onChange: (ids: number[]) => void;
     canEditMap?: Record<number, boolean>;
     onEditToggle?: (id: number, canEdit: boolean) => void;
+    allowedMemberIds?: number[];
 }
 
-export function MemberSelector({ selected, onChange, canEditMap, onEditToggle }: MemberSelectorProps) {
+export function MemberSelector({ selected, onChange, canEditMap, onEditToggle, allowedMemberIds }: MemberSelectorProps) {
     const [members, setMembers] = useState<Member[]>([]);
     const [loading, setLoading] = useState(true);
     const currentUser = authService.getCurrentUser();
@@ -38,11 +39,16 @@ export function MemberSelector({ selected, onChange, canEditMap, onEditToggle }:
     }, [currentUser?.id]);
 
     const toggle = (id: number) => {
+        // If allowedMemberIds is provided, prevent selecting members not in the list
+        if (allowedMemberIds && !allowedMemberIds.includes(id)) return;
         onChange(selected.includes(id) ? selected.filter(s => s !== id) : [...selected, id]);
     };
 
     const selectAll = () => {
-        onChange(members.map(m => m.id));
+        const targetMembers = allowedMemberIds
+            ? members.filter(m => allowedMemberIds.includes(m.id))
+            : members;
+        onChange(targetMembers.map(m => m.id));
     };
 
     const clearAll = () => {
@@ -76,6 +82,7 @@ export function MemberSelector({ selected, onChange, canEditMap, onEditToggle }:
                 {members.map(m => {
                     const active = selected.includes(m.id);
                     const canEdit = canEditMap ? !!canEditMap[m.id] : false;
+                    const isAllowed = !allowedMemberIds || allowedMemberIds.includes(m.id);
 
                     return (
                         <div
@@ -84,14 +91,19 @@ export function MemberSelector({ selected, onChange, canEditMap, onEditToggle }:
                                 "group relative flex flex-col p-3 rounded-2xl border-2 transition-all duration-300",
                                 active
                                     ? "bg-primary/5 border-primary/30 shadow-sm"
-                                    : "border-border hover:border-primary/20 hover:bg-muted/30"
+                                    : "border-border hover:border-primary/20 hover:bg-muted/30",
+                                !isAllowed && "opacity-40 grayscale cursor-not-allowed border-dashed"
                             )}
                         >
                             <div className="flex items-center gap-3 mb-2">
                                 <button
                                     type="button"
+                                    disabled={!isAllowed}
                                     onClick={() => toggle(m.id)}
-                                    className="flex items-center gap-2.5 flex-1 text-left"
+                                    className={cn(
+                                        "flex items-center gap-2.5 flex-1 text-left",
+                                        !isAllowed && "cursor-not-allowed"
+                                    )}
                                 >
                                     <div className={cn(
                                         "w-8 h-8 rounded-xl flex items-center justify-center text-[11px] font-black shadow-sm shrink-0",
@@ -100,10 +112,17 @@ export function MemberSelector({ selected, onChange, canEditMap, onEditToggle }:
                                         {getInitials(m.username)}
                                     </div>
                                     <div className="min-w-0">
-                                        <p className={cn("text-xs font-bold leading-none mb-1 truncate", active ? "text-primary" : "text-foreground")}>
-                                            {m.username}
-                                        </p>
-                                        <p className="text-[10px] text-muted-foreground font-medium truncate">{m.role}</p>
+                                        <div className="flex items-center gap-2">
+                                            <p className={cn("text-xs font-bold leading-none truncate", active ? "text-primary" : "text-foreground")}>
+                                                {m.username}
+                                            </p>
+                                            {!isAllowed && (
+                                                <span className="text-[8px] font-black uppercase text-destructive/70 bg-destructive/5 px-1.5 py-0.5 rounded-md border border-destructive/10">
+                                                    Not In Project
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-[10px] text-muted-foreground font-medium truncate mt-1">{m.role}</p>
                                     </div>
                                     {active && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
                                 </button>

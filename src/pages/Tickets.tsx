@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/AppLayout";
-import { Plus, Pencil, Trash2, MoreHorizontal, Bug, AlertCircle, Calendar, FileText, Users, ArrowRight, MessageSquare, Eye, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, MoreHorizontal, Bug, AlertCircle, Calendar, FileText, Users, ArrowRight, MessageSquare, Eye, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -22,9 +22,12 @@ import { ProjectTabs } from "@/components/ProjectTabs";
 import { ticketService, projectService, authService } from "@/services/authService";
 
 const PAGE_SIZE = 10;
-const allStatuses = ["Open", "In Progress", "Closed"];
+const allStatuses = ["All", "Open", "In Progress", "Closed"];
 const allTypes = ["Bug", "Feature", "Improvement", "Task"];
 const allPriorities = ["Low", "Medium", "High", "Critical"];
+
+// Roles that can see all tickets and use the member filter
+const PRIVILEGED_ROLES = ["Architect", "Manager", "Technical Analyst"];
 
 interface Ticket {
   id: number;
@@ -60,11 +63,17 @@ const Tickets = () => {
   const [loading, setLoading] = useState(true);
   const currentUser = authService.getCurrentUser();
 
+  // Determine if the logged-in user has a privileged role
+  const isPrivileged = PRIVILEGED_ROLES.includes(currentUser?.role);
+
   const [typeFilter, setTypeFilter] = useState("All");
   const [priorityFilter, setPriorityFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("Open");
   const [projectFilter, setProjectFilter] = useState<any>("All");
-  const [employeeFilter, setEmployeeFilter] = useState<any>("All");
+  // Everyone (privileged or not) starts seeing only their own assigned tickets
+  const [employeeFilter, setEmployeeFilter] = useState<any>(
+    currentUser?.id?.toString() ?? "All"
+  );
   const [startDateFilter, setStartDateFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
   const [members, setMembers] = useState<any[]>([]);
@@ -344,24 +353,40 @@ const Tickets = () => {
           <div className="h-5 w-px bg-border/60 mx-1 hidden sm:block" />
 
           <div className="flex flex-wrap items-center gap-3 flex-1">
-            {currentUser?.role !== "Developer" && (
-              <div className="relative min-w-[150px] max-w-[200px]">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 z-10 pointer-events-none">
-                  <Users className="w-4 h-4" />
+            {/* Member filter: only visible to privileged roles */}
+            {isPrivileged && (
+              <div className="flex items-center gap-1.5">
+                <div className="relative min-w-[170px] max-w-[220px]">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 z-10 pointer-events-none">
+                    <Users className="w-4 h-4" />
+                  </div>
+                  <AnimatedDropdown
+                    size="sm"
+                    options={[
+                      { label: "All Members", value: "All" },
+                      ...members.map(m => ({ label: m.username, value: m.id.toString() }))
+                    ]}
+                    value={employeeFilter}
+                    onChange={v => { setEmployeeFilter(v); setPage(1); }}
+                    placeholder="Select Member"
+                    className="w-full"
+                    triggerClassName="pl-9 border-border/80 !border-2 !rounded-lg h-9 bg-background text-xs font-semibold shadow-none"
+                  />
                 </div>
-                <AnimatedDropdown
-                  size="sm"
-                  options={[{ label: "All Employees", value: "All" }, ...members.map(m => ({ label: m.username, value: m.id.toString() }))]}
-                  value={employeeFilter}
-                  onChange={v => { setEmployeeFilter(v); setPage(1); }}
-                  placeholder="Assignee"
-                  className="w-full"
-                  triggerClassName="pl-9 border-border/80 !border-2 !rounded-lg h-9 bg-background text-xs font-semibold shadow-none"
-                />
+                {/* Reset button — appears only when filter has changed from own tickets */}
+                {employeeFilter !== (currentUser?.id?.toString() ?? "All") && (
+                  <button
+                    onClick={() => { setEmployeeFilter(currentUser?.id?.toString() ?? "All"); setPage(1); }}
+                    title="Reset to my tickets"
+                    className="flex items-center justify-center w-7 h-7 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive transition-colors shrink-0"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             )}
 
-            {currentUser?.role !== "Developer" && <div className="h-5 w-px bg-border/60 mx-1 hidden md:block" />}
+            {isPrivileged && <div className="h-5 w-px bg-border/60 mx-1 hidden md:block" />}
 
             <div className="flex items-center gap-3 bg-background border border-border/80 rounded-lg px-3 h-9">
               <div className="flex items-center gap-2.5">
@@ -458,7 +483,7 @@ const Tickets = () => {
                         <DropdownMenuContent align="start" className="rounded-xl min-w-[160px] bg-popover border border-border shadow-xl z-50">
                           <DropdownMenuLabel className="text-[10px] tracking-wider capitalize">Change Status</DropdownMenuLabel>
                           <DropdownMenuSeparator />
-                          {allStatuses.map(s => (
+                          {allStatuses.filter(s => s !== "All").map(s => (
                             <DropdownMenuItem key={s} onClick={() => changeStatus(t.id, s)} className={cn("text-xs font-medium", t.status === s && "bg-primary/10 text-primary")}>
                               {s} {t.status === s && <span className="ml-auto text-[10px]">✓</span>}
                             </DropdownMenuItem>
@@ -580,7 +605,19 @@ const Tickets = () => {
             <AnimatedDropdown
               options={[{ label: "General", value: "" }, ...projects.map(p => ({ label: p.name, value: p.id.toString() }))]}
               value={editData.projectId?.toString() || ""}
-              onChange={v => setEditData(d => ({ ...d, projectId: v ? parseInt(v) : null }))}
+              onChange={v => {
+                const newProjectId = v ? parseInt(v) : null;
+                const projectMembers = projects.find(p => p.id === newProjectId)?.members?.map((m: any) => m.id) || [];
+
+                setEditData(d => ({
+                  ...d,
+                  projectId: newProjectId,
+                  // If project is set, filter out assignees not in that project
+                  assignees: newProjectId
+                    ? d.assignees?.filter(id => projectMembers.includes(id))
+                    : d.assignees
+                }));
+              }}
               placeholder="Select project"
             />
           </FormField>
@@ -621,8 +658,28 @@ const Tickets = () => {
             />
           </FormField>
         </div>
-        <FormField label="Assignees" icon={Users}>
-          <MemberSelector selected={editData.assignees || []} onChange={assignees => setEditData(d => ({ ...d, assignees }))} />
+        <FormField
+          label={
+            <div className="flex items-center justify-between w-full">
+              <span>Assignees</span>
+              {editData.projectId && (
+                <span className="text-[10px] font-bold text-warning bg-warning/10 border border-warning/20 rounded-md px-2 py-0.5">
+                  Only project members shown
+                </span>
+              )}
+            </div>
+          }
+          icon={Users}
+        >
+          <MemberSelector
+            selected={editData.assignees || []}
+            onChange={assignees => setEditData(d => ({ ...d, assignees }))}
+            allowedMemberIds={
+              editData.projectId
+                ? (projects.find(p => p.id === editData.projectId)?.members?.map((m: any) => m.id) ?? undefined)
+                : undefined
+            }
+          />
         </FormField>
       </CrudDialog>
 

@@ -4,7 +4,7 @@ import { LucideIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface FormFieldProps {
-  label: string;
+  label: ReactNode;
   icon?: LucideIcon;
   error?: string;
   required?: boolean;
