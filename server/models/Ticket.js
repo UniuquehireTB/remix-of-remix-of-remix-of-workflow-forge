@@ -41,7 +41,15 @@ const Ticket = sequelize.define('Ticket', {
         type: DataTypes.TEXT,
         allowNull: true
     },
-    dueDate: {
+    startDate: {
+        type: DataTypes.DATE,
+        allowNull: true
+    },
+    endDate: {
+        type: DataTypes.DATE,
+        allowNull: true
+    },
+    closedAt: {
         type: DataTypes.DATE,
         allowNull: true
     },

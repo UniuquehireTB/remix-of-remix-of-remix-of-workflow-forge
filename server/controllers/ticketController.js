@@ -4,7 +4,7 @@ const { Op } = require('sequelize');
 
 const getAllTickets = async (req, res) => {
     try {
-        const { search, type, priority, status, projectId, page = 1, limit = 10 } = req.query;
+        const { search, type, priority, status, projectId, startDate, endDate, assigneeId, page = 1, limit = 10 } = req.query;
         const offset = (page - 1) * limit;
 
         const whereClause = {
@@ -20,7 +20,9 @@ const getAllTickets = async (req, res) => {
             ...(status && { status }),
             ...(projectId && projectId !== 'undefined' && projectId !== 'All' && {
                 projectId: projectId === 'null' ? null : projectId
-            })
+            }),
+            ...(startDate && { startDate: { [Op.gte]: new Date(startDate) } }),
+            ...(endDate && { endDate: { [Op.lte]: new Date(endDate) } })
         };
 
         // Visibility Logic: 
@@ -48,7 +50,13 @@ const getAllTickets = async (req, res) => {
             offset: parseInt(offset),
             include: [
                 { model: Project, as: 'project', attributes: ['id', 'name'] },
-                { model: User, as: 'assignees', attributes: ['id', 'username', 'role'], through: { attributes: [] } }
+                {
+                    model: User,
+                    as: 'assignees',
+                    attributes: ['id', 'username', 'role'],
+                    through: { attributes: [] },
+                    ...(assigneeId && { where: { id: assigneeId } })
+                }
             ],
             order: [['createdAt', 'DESC']]
         });
@@ -71,7 +79,7 @@ const getAllTickets = async (req, res) => {
 
 const createTicket = async (req, res) => {
     try {
-        const { title, description, type, priority, projectId, assignees, dueDate } = req.body;
+        const { title, description, type, priority, projectId, assignees, startDate, endDate } = req.body;
 
         // Generate Ticket ID (TK-XXXX)
         const lastTicket = await Ticket.findOne({ order: [['id', 'DESC']] });
@@ -86,7 +94,8 @@ const createTicket = async (req, res) => {
             priority,
             status: 'Open', // Fixed initial status
             projectId: projectId || null,
-            dueDate,
+            startDate,
+            endDate,
             createdBy: req.user.id,
             modifiedBy: req.user.id
         });
@@ -133,7 +142,14 @@ const updateTicketStatus = async (req, res) => {
         const ticket = await Ticket.findByPk(id);
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 
-        await ticket.update({ status, modifiedBy: req.user.id });
+        const updateData = { status, modifiedBy: req.user.id };
+        if (status === 'Closed') {
+            updateData.closedAt = new Date();
+        } else {
+            updateData.closedAt = null;
+        }
+
+        await ticket.update(updateData);
 
         // Notify Assignees + Creator
         const ticketId = ticket.id;
@@ -194,13 +210,13 @@ const updateTicketRemarks = async (req, res) => {
 const updateTicket = async (req, res) => {
     try {
         const { id } = req.params;
-        const { title, description, type, priority, projectId, assignees, dueDate } = req.body;
+        const { title, description, type, priority, projectId, assignees, startDate, endDate, status, closedAt, remarks } = req.body;
 
         const ticket = await Ticket.findByPk(id);
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 
         await ticket.update({
-            title, description, type, priority, projectId, dueDate,
+            title, description, type, priority, projectId, startDate, endDate, status, closedAt, remarks,
             modifiedBy: req.user.id
         });
 

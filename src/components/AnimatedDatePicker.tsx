@@ -36,6 +36,7 @@ interface AnimatedDatePickerProps {
   placeholder?: string;
   error?: boolean;
   className?: string;
+  triggerClassName?: string;
 }
 
 export function AnimatedDatePicker({
@@ -44,6 +45,7 @@ export function AnimatedDatePicker({
   placeholder = "Pick a date",
   error,
   className,
+  triggerClassName,
 }: AnimatedDatePickerProps) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<View>("day");
@@ -105,7 +107,8 @@ export function AnimatedDatePicker({
             "w-full flex items-center gap-2 border-2 rounded-xl bg-background px-3.5 py-2.5 text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary",
             error ? "!border-destructive focus:ring-destructive/20" : "border-input",
             open && "ring-2 ring-primary/20 border-primary",
-            selected && "pr-8"   // make room for the clear button
+            selected && "pr-8",   // make room for the clear button
+            triggerClassName
           )}
         >
           <CalendarIcon className="w-4 h-4 text-muted-foreground shrink-0" />

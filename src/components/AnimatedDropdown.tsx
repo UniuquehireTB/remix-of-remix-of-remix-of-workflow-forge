@@ -18,6 +18,7 @@ interface AnimatedDropdownProps {
   error?: boolean;
   size?: "sm" | "md";
   disabled?: boolean;
+  triggerClassName?: string;
 }
 
 export function AnimatedDropdown({
@@ -29,6 +30,7 @@ export function AnimatedDropdown({
   error,
   size = "md",
   disabled,
+  triggerClassName,
 }: AnimatedDropdownProps) {
   const [open, setOpen] = useState(false);
   const [openUpward, setOpenUpward] = useState(false);
@@ -78,7 +80,8 @@ export function AnimatedDropdown({
           size === "sm" ? "px-3 py-2 text-xs" : "px-3.5 py-2.5",
           error ? "!border-destructive focus:ring-destructive/20" : "border-input",
           open && "ring-2 ring-primary/20 border-primary",
-          disabled && "opacity-50 cursor-not-allowed bg-muted"
+          disabled && "opacity-50 cursor-not-allowed bg-muted",
+          triggerClassName
         )}
       >
         <span className={cn(!selected && "text-muted-foreground/50")}>
@@ -152,6 +155,7 @@ interface FilterDropdownProps {
   value: string;
   onChange: (value: string) => void;
   allLabel?: string;
+  triggerClassName?: string;
 }
 
 export function FilterDropdown({
@@ -159,6 +163,7 @@ export function FilterDropdown({
   value,
   onChange,
   allLabel = "All",
+  triggerClassName,
 }: FilterDropdownProps) {
   return (
     <AnimatedDropdown
@@ -170,6 +175,7 @@ export function FilterDropdown({
       value={value}
       onChange={onChange}
       className="min-w-[130px]"
+      triggerClassName={triggerClassName}
     />
   );
 }

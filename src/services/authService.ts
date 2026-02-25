@@ -85,9 +85,9 @@ export const projectService = {
 };
 
 export const ticketService = {
-    getAll: async (params: { search?: string, type?: string, priority?: string, status?: string, projectId?: any, page?: number, limit?: number }) => {
+    getAll: async (params: { search?: string, type?: string, priority?: string, status?: string, projectId?: any, startDate?: string, endDate?: string, assigneeId?: any, page?: number, limit?: number }) => {
         const filteredParams = Object.fromEntries(
-            Object.entries(params).filter(([_, v]) => v !== undefined && v !== null)
+            Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== 'All')
         );
         const query = new URLSearchParams(filteredParams as any).toString();
         return apiService.get(`/tickets?${query}`);
