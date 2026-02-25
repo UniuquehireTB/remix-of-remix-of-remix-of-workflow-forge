@@ -242,12 +242,30 @@ const Notes = () => {
       {/* Top Bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
         <div className="flex items-center gap-2 flex-wrap">
-          <FilterDropdown
-            options={["note", "list"]}
-            value={typeFilter === "All" ? "All" : typeFilter}
-            onChange={v => { setTypeFilter(v); setPage(1); }}
-            allLabel="All Types"
-          />
+          <div className="flex bg-muted/30 p-1 rounded-xl border border-border/50">
+            {["All", "note", "list"].map((t) => {
+              const active = typeFilter === t;
+              return (
+                <button
+                  key={t}
+                  onClick={() => { setTypeFilter(t); setPage(1); }}
+                  className={cn(
+                    "relative px-4 py-1.5 text-xs font-bold transition-all duration-300 rounded-lg whitespace-nowrap capitalize",
+                    active ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <span className="relative z-10">{t === "All" ? "All Types" : t}</span>
+                  {active && (
+                    <motion.div
+                      layoutId="activeType"
+                      className="absolute inset-0 bg-primary rounded-lg shadow-sm"
+                      transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <SearchBar value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Search notes..." className="flex-1 sm:max-w-xs" />

@@ -59,7 +59,7 @@ const Tickets = () => {
 
   const [typeFilter, setTypeFilter] = useState("All");
   const [priorityFilter, setPriorityFilter] = useState("All");
-  const [statusFilter, setStatusFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("Open");
   const [projectFilter, setProjectFilter] = useState<any>("All");
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -143,6 +143,7 @@ const Tickets = () => {
     try {
       const payload = {
         ...editData,
+        dueDate: editData.dueDate || null,   // send null, not empty string, when cleared
         assignees: editData.assignees?.map(a => typeof a === 'object' ? a.id : a)
       };
 
@@ -176,7 +177,15 @@ const Tickets = () => {
   const changeStatus = async (ticketId: number, newStatus: string) => {
     try {
       await ticketService.updateStatus(ticketId, newStatus);
-      setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: newStatus } : t));
+
+      // If the current filter isn't "All" and the new status doesn't match the filter, 
+      // remove it from the immediate view.
+      if (statusFilter !== "All" && newStatus !== statusFilter) {
+        setTickets(prev => prev.filter(t => t.id !== ticketId));
+      } else {
+        setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: newStatus } : t));
+      }
+
       toast({ title: "Status Changed", description: `Ticket moved to ${newStatus}` });
     } catch (err) {
       toast({ title: "❌ Error", description: "Failed to update status", variant: "destructive" });
@@ -216,7 +225,31 @@ const Tickets = () => {
         <div className="flex items-center gap-2 flex-wrap">
           <FilterDropdown options={allTypes} value={typeFilter} onChange={v => { setTypeFilter(v); setPage(1); }} allLabel="All Types" />
           <FilterDropdown options={allPriorities} value={priorityFilter} onChange={v => { setPriorityFilter(v); setPage(1); }} allLabel="All Priorities" />
-          <FilterDropdown options={allStatuses} value={statusFilter} onChange={v => { setStatusFilter(v); setPage(1); }} allLabel="All Statuses" />
+
+          <div className="flex bg-muted/30 p-1 rounded-xl border border-border/50">
+            {allStatuses.map((s) => {
+              const active = statusFilter === s;
+              return (
+                <button
+                  key={s}
+                  onClick={() => { setStatusFilter(s); setPage(1); }}
+                  className={cn(
+                    "relative px-4 py-1.5 text-xs font-bold transition-all duration-300 rounded-lg whitespace-nowrap",
+                    active ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <span className="relative z-10">{s}</span>
+                  {active && (
+                    <motion.div
+                      layoutId="activeStatus"
+                      className="absolute inset-0 bg-primary rounded-lg shadow-sm"
+                      transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <SearchBar value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Search tickets..." />
@@ -302,18 +335,22 @@ const Tickets = () => {
                       {t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—"}
                     </td>
                     <td className="py-3.5 px-4" onClick={e => e.stopPropagation()}>
-                      <div className="flex -space-x-1 overflow-hidden">
-                        {t.assignees?.slice(0, 3).map((a, idx) => (
-                          <div key={idx} className="w-6 h-6 rounded-md bg-primary/10 border border-card flex items-center justify-center text-[8px] font-bold text-primary" title={a.username}>
-                            {a.username.slice(0, 2).toUpperCase()}
-                          </div>
-                        ))}
-                        {t.assignees?.length > 3 && (
-                          <div className="w-6 h-6 rounded-md bg-muted border border-card flex items-center justify-center text-[8px] font-bold text-muted-foreground">
-                            +{t.assignees.length - 3}
-                          </div>
-                        )}
-                      </div>
+                      {t.assignees?.length > 0 ? (
+                        <div className="flex -space-x-1 overflow-hidden">
+                          {t.assignees.slice(0, 3).map((a, idx) => (
+                            <div key={idx} className="w-6 h-6 rounded-md bg-primary/10 border border-card flex items-center justify-center text-[8px] font-bold text-primary" title={a.username}>
+                              {a.username.slice(0, 2).toUpperCase()}
+                            </div>
+                          ))}
+                          {t.assignees.length > 3 && (
+                            <div className="w-6 h-6 rounded-md bg-muted border border-card flex items-center justify-center text-[8px] font-bold text-muted-foreground">
+                              +{t.assignees.length - 3}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </td>
                     <td className="py-3.5 px-4" onClick={e => e.stopPropagation()}>
                       <button onClick={() => { setRemarkTarget(t.id); setRemarkText(t.remarks || ""); }}
