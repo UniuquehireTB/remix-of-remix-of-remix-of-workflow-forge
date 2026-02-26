@@ -68,6 +68,8 @@ const Notes = () => {
   const { toast } = useToast();
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelMode, setPanelMode] = useState<"create" | "edit">("create");
+  const [isSyncing, setIsSyncing] = useState(false);
+  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentUser = authService.getCurrentUser();
 
   const fetchNotes = async () => {
@@ -158,6 +160,7 @@ const Notes = () => {
     setNewContent("");
     setNewProjectId(projectFilter === "All" || projectFilter === "General" ? null : projectFilter);
     setNewListItems([{ id: "new1", text: "", checked: false }]);
+    setEditingId(null); // Fix: Reset editingId so auto-save works for the next new note
     setPanelMode("create");
     setPanelOpen(true);
   };
@@ -167,15 +170,21 @@ const Notes = () => {
       toast({ title: "⚠️ Title Required", description: "Please enter a title.", variant: "destructive" });
       return;
     }
+    const payload = {
+      title: newTitle.trim() || "Untitled",
+      content: createType === "note" ? newContent.trim() : "",
+      type: createType,
+      listItems: createType === "list" ? newListItems.filter(i => i.text.trim()) : undefined,
+      projectId: newProjectId,
+    };
     try {
-      await noteService.create({
-        title: newTitle.trim(),
-        content: createType === "note" ? newContent.trim() : "",
-        type: createType,
-        listItems: createType === "list" ? newListItems.filter(i => i.text.trim()) : undefined,
-        projectId: newProjectId,
-      });
-      fetchNotes();
+      const response = await noteService.create(payload);
+
+      // Add to local state immediately for instant feedback
+      const newNote = { ...response, user: currentUser, canEdit: true };
+      setNotes(prev => [newNote, ...prev]);
+      setTotalItems(prev => prev + 1);
+
       setPanelOpen(false);
       toast({ title: "📝 Note Created", description: "Your note has been saved." });
     } catch (err) {
@@ -183,27 +192,129 @@ const Notes = () => {
     }
   };
 
-  const handleUpdate = async () => {
-    if (!newTitle.trim()) {
-      toast({ title: "⚠️ Title Required", description: "Please enter a title.", variant: "destructive" });
-      return;
-    }
+  const handleUpdate = async (manual = false) => {
     if (!editingId) return;
+    setIsSyncing(true);
+    const payload = {
+      title: newTitle.trim() || "Untitled",
+      content: createType === "note" ? newContent.trim() : "",
+      type: createType,
+      listItems: createType === "list" ? newListItems.filter(i => i.text.trim()) : undefined,
+      projectId: newProjectId,
+    };
     try {
-      await noteService.update(editingId, {
-        title: newTitle.trim(),
+      await noteService.update(editingId, payload);
+
+      // Update local state immediately for instant feedback
+      setNotes(prev => prev.map(n => n.id === editingId ? { ...n, ...payload } : n));
+
+      if (manual) {
+        setPanelOpen(false);
+        toast({ title: "✅ Note Updated" });
+      }
+    } catch (err) {
+      if (manual) toast({ title: "❌ Error", description: "Failed to update note", variant: "destructive" });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleCreateSilent = async () => {
+    try {
+      const response = await noteService.create({
+        title: newTitle.trim() || "Untitled",
         content: createType === "note" ? newContent.trim() : "",
         type: createType,
         listItems: createType === "list" ? newListItems.filter(i => i.text.trim()) : undefined,
         projectId: newProjectId,
       });
-      fetchNotes();
-      setPanelOpen(false);
-      toast({ title: "✅ Note Updated" });
+      const createdNote = response;
+      const newNote = { ...createdNote, user: currentUser, canEdit: true };
+      setNotes(prev => [newNote, ...prev]);
+      setTotalItems(prev => prev + 1);
     } catch (err) {
-      toast({ title: "❌ Error", description: "Failed to update note", variant: "destructive" });
+      console.error("Silent create failed", err);
     }
   };
+
+  const handleDeleteDirect = async (id: number) => {
+    try {
+      await noteService.delete(id);
+      setNotes(prev => prev.filter(n => n.id !== id));
+      setTotalItems(prev => prev - 1);
+    } catch (err) {
+      console.error("Failed to delete empty note", err);
+    }
+  };
+
+  const handleClosePanel = () => {
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+
+    const isEmpty = !newTitle.trim() && (createType === "note" ? !newContent.trim() : !newListItems.filter(i => i.text.trim()).length);
+
+    if (panelMode === "edit" && editingId) {
+      if (isEmpty) {
+        handleDeleteDirect(editingId);
+        setEditingId(null);
+        setPanelMode("create");
+      } else {
+        handleUpdate(false);
+      }
+    } else if (panelMode === "create" && !editingId && !isSyncing) {
+      if (!isEmpty) {
+        handleCreateSilent();
+      }
+    }
+    setPanelOpen(false);
+  };
+
+  // Auto-save logic
+  useEffect(() => {
+    if (!panelOpen || !canEdit) return;
+
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+
+    syncTimeoutRef.current = setTimeout(async () => {
+      const isEmpty = !newTitle.trim() && (createType === "note" ? !newContent.trim() : !newListItems.filter(i => i.text.trim()).length);
+
+      if (panelMode === "edit" && editingId) {
+        if (isEmpty) {
+          handleDeleteDirect(editingId);
+          setEditingId(null);
+          setPanelMode("create");
+        } else {
+          handleUpdate(false);
+        }
+      } else if (panelMode === "create" && !isSyncing && !editingId) {
+        if (!isEmpty) {
+          try {
+            setIsSyncing(true);
+            const response = await noteService.create({
+              title: newTitle.trim() || "Untitled",
+              content: createType === "note" ? newContent.trim() : "",
+              type: createType,
+              listItems: createType === "list" ? newListItems.filter(i => i.text.trim()) : undefined,
+              projectId: newProjectId,
+            });
+            const createdNote = response;
+            setEditingId(createdNote.id);
+            setPanelMode("edit");
+            const newNote = { ...createdNote, user: currentUser, canEdit: true };
+            setNotes(prev => [newNote, ...prev]);
+            setTotalItems(prev => prev + 1);
+          } catch (err) {
+            console.error("Auto-create failed", err);
+          } finally {
+            setIsSyncing(false);
+          }
+        }
+      }
+    }, 500);
+
+    return () => {
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    };
+  }, [newTitle, newContent, newListItems, newProjectId, panelOpen]);
 
   const togglePin = async (id: number) => {
     try {
@@ -408,6 +519,10 @@ const Notes = () => {
       >
         <div className="space-y-6">
           <MemberSelector
+            label="Share with Members"
+            icon={Users}
+            showSelf={false}
+            variant="notes"
             selected={sharedUserIds}
             onChange={setSharedUserIds}
             canEditMap={sharePermissions}
@@ -425,7 +540,7 @@ const Notes = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-[60] bg-background/40 backdrop-blur-sm"
-              onClick={() => setPanelOpen(false)}
+              onClick={handleClosePanel}
             />
             <motion.div
               initial={{ x: "100%" }}
@@ -453,7 +568,7 @@ const Notes = () => {
                     </p>
                   </div>
                 </div>
-                <button onClick={() => setPanelOpen(false)} className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+                <button onClick={handleClosePanel} className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -580,14 +695,32 @@ const Notes = () => {
                 </div>
               </div>
 
-              <div className="p-8 border-t border-border bg-card shadow-[0_-8px_30px_-15px_rgba(0,0,0,0.1)] flex items-center justify-between">
-                <Button variant="ghost" onClick={() => setPanelOpen(false)} className="rounded-2xl px-6 font-bold">Close</Button>
+              <div className="px-6 py-4 border-t border-border bg-muted/30 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-4">
+                  <Button variant="ghost" onClick={handleClosePanel} className="rounded-xl px-5 h-9 text-xs">
+                    <X className="w-3.5 h-3.5 mr-1.5" />
+                    Close
+                  </Button>
+                  {isSyncing && (
+                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary animate-pulse">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                      Syncing...
+                    </div>
+                  )}
+                  {!isSyncing && panelMode === "edit" && (
+                    <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+                      <Check className="w-3 h-3" />
+                      Saved
+                    </div>
+                  )}
+                </div>
                 {canEdit && (
                   <Button
-                    onClick={panelMode === "create" ? handleCreate : handleUpdate}
-                    className="rounded-2xl px-10 h-12 font-black shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all active:scale-95"
+                    onClick={() => panelMode === "create" ? handleCreate() : handleUpdate(true)}
+                    className="rounded-xl px-5 h-9 text-xs shadow-lg shadow-primary/25"
                   >
-                    {panelMode === "create" ? "Build Note" : "Sync Changes"}
+                    <Check className="w-3.5 h-3.5 mr-1.5" />
+                    {panelMode === "create" ? (createType === "note" ? "Build Note" : "Create List") : "Ready"}
                   </Button>
                 )}
               </div>

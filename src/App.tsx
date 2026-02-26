@@ -10,6 +10,7 @@ import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
 import ProtectedRoute from "./components/ProtectedRoute";
+import { AutoLogoutProvider } from "./components/AutoLogoutProvider";
 
 const queryClient = new QueryClient();
 
@@ -19,18 +20,20 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
+        <AutoLogoutProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
 
-          {/* Protected Routes */}
-          <Route element={<ProtectedRoute />}>
-            <Route path="/" element={<Projects />} />
-            <Route path="/tickets" element={<Tickets />} />
-            <Route path="/notes" element={<Notes />} />
-          </Route>
+            {/* Protected Routes */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/" element={<Projects />} />
+              <Route path="/tickets" element={<Tickets />} />
+              <Route path="/notes" element={<Notes />} />
+            </Route>
 
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AutoLogoutProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

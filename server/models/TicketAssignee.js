@@ -15,6 +15,10 @@ const TicketAssignee = sequelize.define('TicketAssignee', {
         type: DataTypes.INTEGER,
         allowNull: false,
     },
+    joinDate: {
+        type: DataTypes.DATEONLY,
+        allowNull: true,
+    },
 }, {
     tableName: 'TicketAssignees',
     timestamps: true

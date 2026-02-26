@@ -84,4 +84,40 @@ const login = async (req, res) => {
     }
 };
 
-module.exports = { register, login };
+const refresh = async (req, res) => {
+    try {
+        // req.user is set by authMiddleware
+        if (!req.user) {
+            return res.status(401).json({ message: 'Not authenticated' });
+        }
+
+        // Find user to make sure they still exist and get latest info
+        const user = await User.findByPk(req.user.id);
+        if (!user) {
+            return res.status(401).json({ message: 'User no longer exists' });
+        }
+
+        // Generate new JWT
+        const token = jwt.sign(
+            { id: user.id, username: user.username, role: user.role },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' }
+        );
+
+        res.status(200).json({
+            message: 'Token refreshed successfully',
+            token,
+            user: {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                role: user.role,
+            },
+        });
+    } catch (error) {
+        console.error('Refresh token error:', error);
+        res.status(500).json({ message: 'Server error during token refresh' });
+    }
+};
+
+module.exports = { register, login, refresh };

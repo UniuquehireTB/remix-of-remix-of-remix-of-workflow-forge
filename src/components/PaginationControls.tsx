@@ -18,7 +18,9 @@ export function PaginationControls({ page, totalPages, onPageChange, totalItems,
   return (
     <div className="flex items-center justify-between mt-6 animate-fade-in">
       <p className="text-xs text-muted-foreground font-medium">
-        Showing <span className="text-foreground font-semibold">{start}–{end}</span> of <span className="text-foreground font-semibold">{totalItems}</span>
+        Showing <span className="text-foreground font-semibold">
+          {start === end ? start : `${start} to ${end}`}
+        </span> of <span className="text-foreground font-semibold">{totalItems}</span> results
       </p>
       <div className="flex items-center gap-1">
         <Button variant="ghost" size="sm" onClick={() => onPageChange(page - 1)} disabled={page <= 1} className="h-9 w-9 p-0 rounded-xl">

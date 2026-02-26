@@ -3,7 +3,7 @@ import { authService } from "@/services/authService";
 
 const ProtectedRoute = () => {
     const user = authService.getCurrentUser();
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     if (!user || !token) {
         return <Navigate to="/login" replace />;

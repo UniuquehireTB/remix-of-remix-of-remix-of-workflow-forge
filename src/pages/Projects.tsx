@@ -251,7 +251,13 @@ const Projects = () => {
               placeholder="Brief project description..." rows={3} value={editData.description || ""} onChange={e => { setEditData(d => ({ ...d, description: e.target.value })); setErrors(p => ({ ...p, description: "" })); }} />
           </FormField>
           <FormField label="Members" icon={Users}>
-            <MemberSelector selected={editData.members || []} onChange={members => setEditData(d => ({ ...d, members }))} />
+            <MemberSelector
+              variant="projects"
+              showSelf={false}
+              showTeam={false}
+              selected={editData.members || []}
+              onChange={members => setEditData(d => ({ ...d, members }))}
+            />
           </FormField>
         </div>
       </CrudDialog>

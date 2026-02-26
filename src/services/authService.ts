@@ -5,7 +5,7 @@ const API_URL = import.meta.env.VITE_API_URL || '/api';
 export const apiService = {
     // Generic request helper that includes the JWT token
     request: async (endpoint: string, options: any = {}) => {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const headers = {
             'Content-Type': 'application/json',
             ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
@@ -22,8 +22,8 @@ export const apiService = {
         if (response.status === 401 || response.status === 403) {
             // Only redirect if we're not already trying to login
             if (!endpoint.includes('/auth/login')) {
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
+                sessionStorage.removeItem('token');
+                sessionStorage.removeItem('user');
                 window.location.href = '/login';
                 throw new Error('Session expired. Please login again.');
             }
@@ -50,24 +50,33 @@ export const authService = {
     login: async (credentials: any) => {
         const data = await apiService.post('/auth/login', credentials);
         if (data.token) {
-            localStorage.setItem('token', data.token);
-            localStorage.setItem('user', JSON.stringify(data.user));
+            sessionStorage.setItem('token', data.token);
+            sessionStorage.setItem('user', JSON.stringify(data.user));
         }
         return data;
     },
 
     logout: () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
     },
 
     getCurrentUser: () => {
-        const user = localStorage.getItem('user');
+        const user = sessionStorage.getItem('user');
         return user ? JSON.parse(user) : null;
     },
 
     getMembersList: async () => {
         return apiService.get('/user/members-list');
+    },
+
+    refresh: async () => {
+        const data = await apiService.post('/auth/refresh', {});
+        if (data.token) {
+            sessionStorage.setItem('token', data.token);
+            sessionStorage.setItem('user', JSON.stringify(data.user));
+        }
+        return data;
     }
 };
 

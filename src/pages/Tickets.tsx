@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
+import { format } from "date-fns";
 import { AppLayout } from "@/components/AppLayout";
-import { Plus, Pencil, Trash2, MoreHorizontal, Bug, AlertCircle, Calendar, FileText, Users, ArrowRight, MessageSquare, Eye, Check, X, UserIcon } from "lucide-react";
+import { Plus, Pencil, Trash2, MoreHorizontal, Bug, AlertCircle, Calendar, FileText, Users, ArrowRight, MessageSquare, Eye, Check, X, UserIcon, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -22,7 +23,7 @@ import { ProjectTabs } from "@/components/ProjectTabs";
 import { ticketService, projectService, authService } from "@/services/authService";
 
 const PAGE_SIZE = 10;
-const allStatuses = ["All", "Open", "In Progress", "Closed"];
+const allStatuses = ["All", "Open", "In Progress", "On Hold", "Closed"];
 const allTypes = ["Bug", "Feature", "Improvement", "Task"];
 const allPriorities = ["Low", "Medium", "High", "Critical"];
 
@@ -46,7 +47,7 @@ interface Ticket {
 }
 
 const emptyTicket = (): Partial<Ticket> => ({
-  title: "", description: "", type: "Bug", priority: "Medium",
+  title: "", description: "", type: "", priority: "",
   projectId: null, startDate: "", endDate: "", assignees: []
 });
 
@@ -68,7 +69,7 @@ const Tickets = () => {
 
   const [typeFilter, setTypeFilter] = useState("All");
   const [priorityFilter, setPriorityFilter] = useState("All");
-  const [statusFilter, setStatusFilter] = useState("Open");
+  const [statusFilter, setStatusFilter] = useState("All");
   const [projectFilter, setProjectFilter] = useState<any>("All");
   // Privileged roles see all members' tickets by default; others see only their own
   const [employeeFilter, setEmployeeFilter] = useState<any>(
@@ -142,6 +143,70 @@ const Tickets = () => {
     fetchMembers();
   }, []);
 
+  // Instant reactive validation for dates
+  useEffect(() => {
+    if (!dialogOpen) return;
+
+    setErrors(prev => {
+      const e = { ...prev };
+      let changed = false;
+
+      const hasAssigneeWithDate = editData.assignees?.some(a =>
+        typeof a === 'object' && a.joinDate && a.joinDate !== ""
+      );
+
+      // Validate Required End Date
+      if ((editData.startDate || hasAssigneeWithDate) && !editData.endDate) {
+        if (e.endDate !== "End date is required if any dates are assigned") {
+          e.endDate = "End date is required if any dates are assigned";
+          changed = true;
+        }
+      } else {
+        if (e.endDate === "End date is required if any dates are assigned") {
+          delete e.endDate;
+          changed = true;
+        }
+
+        // Validate range if both exist
+        const dateError = (editData.startDate && editData.endDate && new Date(editData.endDate) < new Date(editData.startDate))
+          ? "End date cannot be earlier than start date"
+          : "";
+
+        if (e.endDate !== dateError && (dateError || e.endDate === "End date cannot be earlier than start date")) {
+          if (dateError) e.endDate = dateError;
+          else delete e.endDate;
+          changed = true;
+        }
+      }
+
+      // Validate Assignee Join Dates
+      let assigneeErr = "";
+      if (editData.assignees && Array.isArray(editData.assignees)) {
+        for (const a of editData.assignees) {
+          if (typeof a === 'object' && a.joinDate) {
+            const joinDate = new Date(a.joinDate);
+            if (editData.endDate && joinDate > new Date(editData.endDate)) {
+              assigneeErr = "Assignee join date cannot be later than ticket end date";
+              break;
+            }
+            if (editData.startDate && joinDate < new Date(editData.startDate)) {
+              assigneeErr = "Assignee join date cannot be earlier than ticket start date";
+              break;
+            }
+          }
+        }
+      }
+
+      if (e.assignees !== assigneeErr && (assigneeErr || e.assignees?.includes("Assignee join date"))) {
+        if (assigneeErr) e.assignees = assigneeErr;
+        else delete e.assignees;
+        changed = true;
+      }
+
+      return changed ? e : prev;
+    });
+  }, [editData.startDate, editData.endDate, editData.assignees, dialogOpen]);
+
   const openCreate = () => {
     setEditData({
       ...emptyTicket(),
@@ -155,7 +220,10 @@ const Tickets = () => {
   const openEdit = (t: Ticket) => {
     setEditData({
       ...t,
-      assignees: t.assignees?.map(a => a.id)
+      assignees: t.assignees?.map(a => ({
+        id: a.id,
+        joinDate: a.TicketAssignee?.joinDate || ""
+      }))
     });
     setEditingId(t.id);
     setErrors({});
@@ -166,18 +234,81 @@ const Tickets = () => {
     const e: Record<string, string> = {};
     if (!editData.title?.trim()) e.title = "Title is required";
     if (!editData.description?.trim()) e.description = "Description is required";
+    if (!editData.type) e.type = "Type is required";
+    if (!editData.priority) e.priority = "Priority is required";
+
+    const hasAssigneeWithDate = editData.assignees?.some(a =>
+      typeof a === 'object' && a.joinDate && a.joinDate !== ""
+    );
+
+    if ((editData.startDate || hasAssigneeWithDate) && !editData.endDate) {
+      e.endDate = "End date is required if any dates are assigned";
+    }
+
+    if (editData.startDate && editData.endDate) {
+      if (new Date(editData.endDate) < new Date(editData.startDate)) {
+        e.endDate = "End date cannot be earlier than start date";
+      }
+    }
+
+    // New validations for assignee join dates
+    if (editData.assignees && Array.isArray(editData.assignees)) {
+      for (const a of editData.assignees) {
+        if (typeof a === 'object' && a.joinDate) {
+          const joinDate = new Date(a.joinDate);
+
+          if (editData.endDate) {
+            const endDate = new Date(editData.endDate);
+            if (joinDate > endDate) {
+              e.assignees = "Assignee join date cannot be later than ticket end date";
+              break;
+            }
+          }
+
+          if (editData.startDate) {
+            const startDate = new Date(editData.startDate);
+            if (joinDate < startDate) {
+              e.assignees = "Assignee join date cannot be earlier than ticket start date";
+              break;
+            }
+          }
+        }
+      }
+    }
+
     setErrors(e);
-    return Object.keys(e).length === 0;
+    return { isValid: Object.keys(e).length === 0, errors: e };
   };
 
   const handleSave = async () => {
-    if (!validate()) return;
+    const { isValid, errors: foundErrors } = validate();
+    if (!isValid) {
+      // Find the first dependency-related error to show in a toast
+      const dependencyError = Object.values(foundErrors).find(msg =>
+        msg.includes("later than") ||
+        msg.includes("earlier than") ||
+        msg.includes("required if any dates")
+      ) || (Object.keys(foundErrors).length > 0 ? "Please fill in all required fields highlighted in red." : null);
+
+      if (dependencyError) {
+        toast({
+          title: "⚠️ Validation Error",
+          description: dependencyError,
+          variant: "destructive",
+        });
+      }
+      return;
+    }
     try {
       const payload = {
         ...editData,
         startDate: editData.startDate || null,
         endDate: editData.endDate || null,
-        assignees: editData.assignees?.map(a => typeof a === 'object' ? a.id : a)
+        assignees: editData.assignees?.map(a => {
+          const userId = typeof a === 'object' ? a.id : a;
+          const joinDate = (typeof a === 'object' && a.joinDate) ? a.joinDate || null : null;
+          return { id: userId, joinDate };
+        })
       };
 
       if (editingId) {
@@ -510,31 +641,93 @@ const Tickets = () => {
                       </DropdownMenu>
                     </td>
                     <td className="py-3.5 px-4 text-xs text-muted-foreground whitespace-nowrap">
-                      {t.startDate ? new Date(t.startDate).toLocaleDateString() : "—"}
+                      <div className="flex flex-col gap-1">
+                        <span>{t.startDate ? new Date(t.startDate).toLocaleDateString() : "—"}</span>
+                        {(() => {
+                          const collabDates = t.assignees?.filter(a => a.TicketAssignee?.joinDate && a.TicketAssignee.joinDate !== t.startDate);
+                          if (!collabDates || collabDates.length === 0) return null;
+                          return (
+                            <div className="flex flex-col gap-1 mt-1">
+                              {collabDates.map((a, i) => (
+                                <div key={i} className="flex items-center gap-1.5 px-1.5 py-0.5 bg-indigo-500/5 rounded-md border-l-2 border-indigo-500/40 text-[8px] font-black text-indigo-500 animate-in fade-in slide-in-from-left-1 duration-300">
+                                  <Shield className="w-2.5 h-2.5 opacity-70" />
+                                  <span className="uppercase tracking-tight">{a.username.split(' ')[0]} / {new Date(a.TicketAssignee.joinDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
                     </td>
-                    <td className="py-3.5 px-4 text-xs text-muted-foreground whitespace-nowrap">
-                      {t.endDate ? new Date(t.endDate).toLocaleDateString() : "—"}
+                    <td className="py-3.5 px-4 text-xs font-bold whitespace-nowrap">
+                      {(() => {
+                        if (!t.endDate) return <span className="text-muted-foreground">—</span>;
+                        const end = new Date(t.endDate);
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const endDay = new Date(end);
+                        endDay.setHours(0, 0, 0, 0);
+
+                        const isOverdue = today > endDay;
+                        const isDueToday = today.getTime() === endDay.getTime();
+
+                        if (isOverdue && t.status !== "Closed") {
+                          return <span className="text-destructive flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {end.toLocaleDateString()}</span>;
+                        }
+                        if (isDueToday && t.status !== "Closed") {
+                          return <span className="text-orange-500 animate-pulse flex items-center gap-1"><Calendar className="w-3 h-3" /> {end.toLocaleDateString()}</span>;
+                        }
+                        return <span className="text-muted-foreground">{end.toLocaleDateString()}</span>;
+                      })()}
                     </td>
                     <td className="py-3.5 px-4 text-xs font-bold text-success/70 whitespace-nowrap">
                       {t.closedAt ? new Date(t.closedAt).toLocaleDateString() : "—"}
                     </td>
                     <td className="py-3.5 px-4" onClick={e => e.stopPropagation()}>
-                      {t.assignees?.length > 0 ? (
-                        <div className="flex -space-x-1 overflow-hidden">
-                          {t.assignees.slice(0, 2).map((a, idx) => (
-                            <div key={idx} className="w-6 h-6 rounded-md bg-primary/10 border border-card flex items-center justify-center text-[8px] font-bold text-primary" title={a.username}>
-                              {a.username.slice(0, 2).toUpperCase()}
-                            </div>
-                          ))}
-                          {t.assignees.length > 2 && (
-                            <div className="w-6 h-6 rounded-md bg-muted border border-card flex items-center justify-center text-[8px] font-bold text-muted-foreground">
-                              +{t.assignees.length - 2}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
+                      <div className="flex -space-x-1.5 overflow-hidden">
+                        {t.assignees?.map((a, idx) => {
+                          const isSelf = a.id === currentUser?.id;
+                          const joinDate = a.TicketAssignee?.joinDate;
+                          const isCollaborative = !!joinDate;
+                          return (
+                            <Tooltip key={idx}>
+                              <TooltipTrigger asChild>
+                                <div className={cn(
+                                  "w-7 h-7 rounded-lg border-2 flex items-center justify-center text-[9px] font-black transition-transform hover:scale-110 hover:z-20 cursor-help",
+                                  isCollaborative
+                                    ? "bg-indigo-600 text-white border-white shadow-lg shadow-indigo-500/20 ring-1 ring-indigo-500/30"
+                                    : isSelf
+                                      ? "bg-primary text-white border-white shadow-md ring-1 ring-primary/30"
+                                      : "bg-muted text-muted-foreground border-card bg-gradient-to-br from-muted to-muted/50"
+                                )}>
+                                  {a.username.slice(0, 2).toUpperCase()}
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="bg-popover/90 backdrop-blur-md border-border p-2 rounded-xl">
+                                <div className="space-y-1">
+                                  <p className="text-[10px] font-black">{a.username}</p>
+                                  {(() => {
+                                    if (!joinDate) return null;
+                                    try {
+                                      const d = new Date(joinDate);
+                                      if (isNaN(d.getTime())) return null;
+                                      return (
+                                        <p className="text-[9px] font-bold text-indigo-400 flex items-center gap-1">
+                                          <Shield className="w-3 h-3" />
+                                          Collaborate Start: {format(d, "MMM d, yyyy")}
+                                        </p>
+                                      );
+                                    } catch { return null; }
+                                  })()}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })}
+                        {(!t.assignees || t.assignees.length === 0) && (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-3.5 px-4" onClick={e => e.stopPropagation()}>
                       <button
@@ -619,7 +812,7 @@ const Tickets = () => {
             <input className={cn("premium-input", errors.title && "!border-destructive focus:ring-destructive/20")}
               placeholder="What's the issue?" value={editData.title || ""} onChange={e => { setEditData(d => ({ ...d, title: e.target.value })); setErrors(p => ({ ...p, title: "" })); }} />
           </FormField>
-          <FormField label="Project" icon={FileText}>
+          <FormField label="Project" icon={FileText} required>
             <AnimatedDropdown
               options={[{ label: "General", value: "" }, ...projects.map(p => ({ label: p.name, value: p.id.toString() }))]}
               value={editData.projectId?.toString() || ""}
@@ -645,60 +838,86 @@ const Tickets = () => {
             placeholder="Describe the issue in detail..." rows={3} value={editData.description || ""} onChange={e => { setEditData(d => ({ ...d, description: e.target.value })); setErrors(p => ({ ...p, description: "" })); }} />
         </FormField>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormField label="Type">
+          <FormField label="Type" icon={Bug} required error={errors.type}>
             <AnimatedDropdown
               options={allTypes.map(t => ({ label: t, value: t }))}
-              value={editData.type || "Bug"}
-              onChange={v => setEditData(d => ({ ...d, type: v as any }))}
+              value={editData.type || ""}
+              onChange={v => { setEditData(d => ({ ...d, type: v as any })); setErrors(p => ({ ...p, type: "" })); }}
+              placeholder="Select Type *"
+              error={!!errors.type}
             />
           </FormField>
-          <FormField label="Priority" icon={AlertCircle}>
+          <FormField label="Priority" icon={AlertCircle} required error={errors.priority}>
             <AnimatedDropdown
               options={allPriorities.map(p => ({ label: p, value: p }))}
-              value={editData.priority || "Medium"}
-              onChange={v => setEditData(d => ({ ...d, priority: v as any }))}
+              value={editData.priority || ""}
+              onChange={v => { setEditData(d => ({ ...d, priority: v as any })); setErrors(p => ({ ...p, priority: "" })); }}
+              placeholder="Select Priority *"
+              error={!!errors.priority}
             />
           </FormField>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormField label="Start Date" icon={Calendar}>
+          <FormField label="Start Date" icon={Calendar} error={errors.startDate}>
             <AnimatedDatePicker
               value={editData.startDate || ""}
-              onChange={v => setEditData(d => ({ ...d, startDate: v }))}
+              onChange={v => {
+                setEditData(d => {
+                  const hasAssigneeDate = d.assignees?.some(a => typeof a === 'object' && a.joinDate);
+                  const willHaveNoDates = !v && !hasAssigneeDate;
+                  return {
+                    ...d,
+                    startDate: v,
+                    endDate: willHaveNoDates ? "" : d.endDate
+                  };
+                });
+              }}
+              error={!!errors.startDate}
               placeholder="Select start date"
+              showIcon={false}
             />
           </FormField>
-          <FormField label="End Date" icon={Calendar}>
+          <FormField label="End Date" icon={Calendar} error={errors.endDate}>
             <AnimatedDatePicker
               value={editData.endDate || ""}
-              onChange={v => setEditData(d => ({ ...d, endDate: v }))}
-              placeholder="Select end date"
+              onChange={v => {
+                setEditData(d => ({ ...d, endDate: v }));
+              }}
+              error={!!errors.endDate}
+              disabled={!editData.startDate && !editData.assignees?.some(a => typeof a === 'object' && a.joinDate)}
+              placeholder={(!editData.startDate && !editData.assignees?.some(a => typeof a === 'object' && a.joinDate)) ? "Pick Start Date first" : "Select end date"}
+              showIcon={false}
             />
           </FormField>
         </div>
-        <FormField
-          label={
-            <div className="flex items-center justify-between w-full">
-              <span>Assignees</span>
-              {editData.projectId && (
-                <span className="text-[10px] font-bold text-warning bg-warning/10 border border-warning/20 rounded-md px-2 py-0.5">
-                  Only project members shown
-                </span>
-              )}
-            </div>
-          }
-          icon={Users}
-        >
+        <div className="space-y-4">
           <MemberSelector
+            label="Assignees"
+            icon={Users}
             selected={editData.assignees || []}
-            onChange={assignees => setEditData(d => ({ ...d, assignees }))}
+            startDate={editData.startDate}
+            endDate={editData.endDate}
+            onChange={val => {
+              setEditData(d => {
+                const hasAssigneeDate = val.some(a => typeof a === 'object' && a.joinDate);
+                const willHaveNoDates = !d.startDate && !hasAssigneeDate;
+                return {
+                  ...d,
+                  assignees: val,
+                  endDate: willHaveNoDates ? "" : d.endDate
+                };
+              });
+            }}
+            showSelf={true}
+            showTeam={true}
             allowedMemberIds={
               editData.projectId
                 ? (projects.find(p => p.id === editData.projectId)?.members?.map((m: any) => m.id) ?? undefined)
                 : undefined
             }
+            error={errors.assignees}
           />
-        </FormField>
+        </div>
       </CrudDialog>
 
       <DeleteDialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} itemName={deleteTarget?.title || "ticket"} />
