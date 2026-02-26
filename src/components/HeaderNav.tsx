@@ -11,7 +11,7 @@ import { authService, notificationService } from "@/services/authService";
 import { formatDistanceToNow } from "date-fns";
 
 const navItems = [
-  { title: "Projects", url: "/", icon: FolderKanban },
+  { title: "Projects", url: "/projects", icon: FolderKanban },
   { title: "Tickets", url: "/tickets", icon: Bug },
   { title: "Notes", url: "/notes", icon: FileText },
 ];
@@ -109,7 +109,7 @@ export function HeaderNav() {
 
   const getNotificationRoute = (type: string): string | null => {
     const t = type?.toLowerCase();
-    if (t?.includes('project')) return '/';
+    if (t?.includes('project')) return '/projects';
     if (t?.includes('ticket')) return '/tickets';
     if (t?.includes('note')) return '/notes';
     return null;
