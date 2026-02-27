@@ -4,7 +4,7 @@ const { Op } = require('sequelize');
 
 const getAllNotes = async (req, res) => {
     try {
-        const { search, type, projectId, page = 1, limit = 12 } = req.query;
+        const { search, type, projectId, filter = 'All', page = 1, limit = 12 } = req.query;
         const offset = (page - 1) * limit;
 
         // Get IDs of notes shared with me
@@ -17,10 +17,6 @@ const getAllNotes = async (req, res) => {
 
         const whereClause = {
             isActive: true,
-            [Op.or]: [
-                { userId: req.user.id }, // Created by me
-                { id: { [Op.in]: sharedNoteIds } } // Shared with me
-            ],
             ...(search && {
                 [Op.or]: [
                     { title: { [Op.iLike]: `%${search}%` } },
@@ -32,6 +28,29 @@ const getAllNotes = async (req, res) => {
                 projectId: projectId === 'null' ? null : projectId
             })
         };
+
+        // Filter logic
+        if (filter === 'SharedWithMe') {
+            whereClause.id = { [Op.in]: sharedNoteIds };
+        } else if (filter === 'SharedByMe') {
+            // Get IDs of notes I've shared with others
+            const mySharedNoteRecords = await NoteShare.findAll({
+                where: { sharedByUserId: req.user.id },
+                attributes: ['noteId']
+            });
+            const mySharedNoteIds = [...new Set(mySharedNoteRecords.map(r => r.noteId))];
+            whereClause.id = { [Op.in]: mySharedNoteIds };
+        } else {
+            // Default: All (Mine + Shared with me)
+            whereClause[Op.and] = [
+                {
+                    [Op.or]: [
+                        { userId: req.user.id },
+                        { id: { [Op.in]: sharedNoteIds } }
+                    ]
+                }
+            ];
+        }
 
         const { count, rows } = await Note.findAndCountAll({
             where: whereClause,

@@ -48,6 +48,7 @@ const Notes = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [typeFilter, setTypeFilter] = useState<string>("All");
+  const [ownershipFilter, setOwnershipFilter] = useState<string>("All");
   const [projectFilter, setProjectFilter] = useState<any>("All");
   const [deleteTarget, setDeleteTarget] = useState<NoteItem | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -78,6 +79,7 @@ const Notes = () => {
       const response = await noteService.getAll({
         search,
         type: typeFilter,
+        filter: ownershipFilter,
         projectId: projectFilter === "All" ? undefined : (projectFilter === "General" ? "null" : projectFilter),
         page,
         limit: PAGE_SIZE
@@ -103,7 +105,7 @@ const Notes = () => {
 
   useEffect(() => {
     fetchNotes();
-  }, [search, typeFilter, projectFilter, page]);
+  }, [search, typeFilter, ownershipFilter, projectFilter, page]);
 
   useEffect(() => {
     fetchProjects();
@@ -250,19 +252,21 @@ const Notes = () => {
   const handleClosePanel = () => {
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
 
-    const isEmpty = !newTitle.trim() && (createType === "note" ? !newContent.trim() : !newListItems.filter(i => i.text.trim()).length);
+    if (canEdit) {
+      const isEmpty = !newTitle.trim() && (createType === "note" ? !newContent.trim() : !newListItems.filter(i => i.text.trim()).length);
 
-    if (panelMode === "edit" && editingId) {
-      if (isEmpty) {
-        handleDeleteDirect(editingId);
-        setEditingId(null);
-        setPanelMode("create");
-      } else {
-        handleUpdate(false);
-      }
-    } else if (panelMode === "create" && !editingId && !isSyncing) {
-      if (!isEmpty) {
-        handleCreateSilent();
+      if (panelMode === "edit" && editingId) {
+        if (isEmpty) {
+          handleDeleteDirect(editingId);
+          setEditingId(null);
+          setPanelMode("create");
+        } else {
+          handleUpdate(false);
+        }
+      } else if (panelMode === "create" && !editingId && !isSyncing) {
+        if (!isEmpty) {
+          handleCreateSilent();
+        }
       }
     }
     setPanelOpen(false);
@@ -351,24 +355,28 @@ const Notes = () => {
       <ProjectTabs projects={projects} activeProjectId={projectFilter} onChange={v => { setProjectFilter(v); setPage(1); }} />
 
       {/* Top Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6 py-1">
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="flex bg-muted/30 p-1 rounded-xl border border-border/50">
-            {["All", "note", "list"].map((t) => {
-              const active = typeFilter === t;
+            {[
+              { label: "All", value: "All" },
+              { label: "Shared", value: "SharedByMe" },
+              { label: "Received", value: "SharedWithMe" },
+            ].map((f) => {
+              const active = ownershipFilter === f.value;
               return (
                 <button
-                  key={t}
-                  onClick={() => { setTypeFilter(t); setPage(1); }}
+                  key={f.value}
+                  onClick={() => { setOwnershipFilter(f.value); setPage(1); }}
                   className={cn(
                     "relative px-4 py-1.5 text-xs font-bold transition-all duration-300 rounded-lg whitespace-nowrap capitalize",
                     active ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  <span className="relative z-10">{t === "All" ? "All Types" : t}</span>
+                  <span className="relative z-10">{f.label}</span>
                   {active && (
                     <motion.div
-                      layoutId="activeType"
+                      layoutId="activeOwnership"
                       className="absolute inset-0 bg-primary rounded-lg shadow-sm"
                       transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
                     />
@@ -377,14 +385,44 @@ const Notes = () => {
               );
             })}
           </div>
+
+          <AnimatedDropdown
+            options={[
+              { label: "All Types", value: "All" },
+              { label: "Only Notes", value: "note" },
+              { label: "Only Lists", value: "list" },
+            ]}
+            value={typeFilter}
+            onChange={(v) => { setTypeFilter(v); setPage(1); }}
+            placeholder="Format"
+            size="sm"
+            className="w-32"
+            triggerClassName="bg-muted/30 border-border/50 h-9 rounded-xl"
+          />
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <SearchBar value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Search notes..." className="flex-1 sm:max-w-xs" />
-          <Button onClick={() => openCreate("note")} variant="outline" className="gap-1.5 rounded-xl px-4 shrink-0">
-            <FileText className="w-4 h-4" /> Note
+          <div className="flex-1 sm:max-w-xs flex bg-muted/30 p-1 rounded-xl border border-border/50 h-9 transition-all duration-200 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary focus-within:bg-card">
+            <SearchBar
+              value={search}
+              onChange={v => { setSearch(v); setPage(1); }}
+              placeholder="Search notes..."
+              className="w-full h-full"
+              inputClassName="h-full !py-0 !rounded-lg !bg-transparent border-none focus:ring-0 shadow-none"
+            />
+          </div>
+          <Button
+            onClick={() => openCreate("note")}
+            className="gap-1.5 rounded-xl px-5 h-9 shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground border-none shadow-sm transition-all"
+          >
+            <FileText className="w-4 h-4" />
+            <span className="font-bold text-xs">Note</span>
           </Button>
-          <Button onClick={() => openCreate("list")} variant="outline" className="gap-1.5 rounded-xl px-4 shrink-0">
-            <List className="w-4 h-4" /> List
+          <Button
+            onClick={() => openCreate("list")}
+            className="gap-1.5 rounded-xl px-5 h-9 shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground border-none shadow-sm transition-all"
+          >
+            <List className="w-4 h-4" />
+            <span className="font-bold text-xs">List</span>
           </Button>
         </div>
       </div>

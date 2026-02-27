@@ -6,14 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { SearchBar } from "@/components/SearchBar";
 import { PaginationControls } from "@/components/PaginationControls";
-import { CrudDialog, DeleteDialog } from "@/components/CrudDialog";
-import { FormField } from "@/components/FormField";
-import { MemberSelector, MemberBadges } from "@/components/MemberSelector";
-import { projectStatusColors } from "@/lib/data";
+import { DeleteDialog } from "@/components/CrudDialog";
+import { MemberBadges } from "@/components/MemberSelector";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { projectService, authService } from "@/services/authService";
+import { ProjectSidebarForm } from "@/components/ProjectSidebarForm";
+import { ProjectDetailView } from "@/components/ProjectDetailView";
 
 const CAN_MANAGE_PROJECTS = ['Architect', 'Manager', 'System Architect', 'Senior Developer', 'Technical Analyst'];
 
@@ -39,6 +39,7 @@ const Projects = () => {
   const [pagination, setPagination] = useState({ totalItems: 0, itemsLeft: 0, totalPages: 1 });
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [descriptionTarget, setDescriptionTarget] = useState<Project | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
   const [editData, setEditData] = useState<Partial<Project>>(emptyProject());
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -119,22 +120,44 @@ const Projects = () => {
     }
   };
 
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await projectService.delete(deleteTarget.id);
+      toast({ title: "🗑️ Project Deleted", description: `${deleteTarget.name} has been removed.`, variant: "destructive" });
+      fetchProjects();
+      if (descriptionTarget?.id === deleteTarget.id) setDescriptionTarget(null);
+      setDeleteTarget(null);
+    } catch (err) {
+      toast({ title: "❌ Error", description: "Failed to delete project", variant: "destructive" });
+    }
+  };
+
   return (
     <AppLayout title="Projects" subtitle="Manage your organization's projects">
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-8">
-        <div className="flex-1 max-w-md">
-          <SearchBar value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Search projects by title or client..." />
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-6 py-1">
+        <div className="flex-1 max-w-md flex bg-muted/30 p-1 rounded-xl border border-border/50 h-9 transition-all duration-200 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary focus-within:bg-card">
+          <SearchBar
+            value={search}
+            onChange={v => { setSearch(v); setPage(1); }}
+            placeholder="Search projects by title or client..."
+            className="w-full h-full"
+            inputClassName="h-full !py-0 !rounded-lg !bg-transparent border-none focus:ring-0 shadow-none"
+          />
         </div>
         <div className="flex items-center gap-3">
           {pagination.itemsLeft > 0 && (
-            <Badge variant="secondary" className="px-3 py-1.5 rounded-xl bg-primary/5 text-primary border-primary/10">
+            <Badge variant="secondary" className="px-3 py-1.5 rounded-xl bg-primary/5 text-primary border-primary/10 h-9 flex items-center">
               {pagination.itemsLeft} items left
             </Badge>
           )}
           {canManage && (
-            <Button onClick={openCreate} className="gap-2 rounded-xl shadow-lg shadow-primary/25 px-5 shrink-0">
+            <Button
+              onClick={openCreate}
+              className="gap-2 rounded-xl shadow-lg shadow-primary/25 px-5 h-9 shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground border-none transition-all"
+            >
               <Plus className="w-4 h-4" />
-              <span>Create Project</span>
+              <span className="font-bold text-xs">Create Project</span>
             </Button>
           )}
         </div>
@@ -158,7 +181,11 @@ const Projects = () => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   transition={{ delay: i * 0.05 }}
-                  className="group relative bg-card border border-border shadow-sm hover:shadow-xl hover:border-primary/20 rounded-2xl p-6 transition-all duration-300"
+                  onClick={() => setDescriptionTarget(project)}
+                  className={cn(
+                    "group relative bg-card border border-border shadow-sm hover:shadow-xl hover:border-primary/20 rounded-2xl p-6 transition-all duration-300 cursor-pointer",
+                    descriptionTarget?.id === project.id && "ring-2 ring-primary/20 bg-primary/5"
+                  )}
                 >
                   <div className="flex items-start justify-between mb-5">
                     <div className="flex items-center gap-3">
@@ -173,25 +200,7 @@ const Projects = () => {
                         </p>
                       </div>
                     </div>
-                    {canManage && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-muted transition-colors opacity-0 group-hover:opacity-100">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="rounded-xl bg-popover border border-border shadow-xl z-50">
-                          <DropdownMenuItem onClick={() => openEdit(project)} className="cursor-pointer">
-                            <Pencil className="w-3.5 h-3.5 mr-2" />
-                            Edit Project
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setDeleteTarget(project)} className="text-destructive cursor-pointer">
-                            <Trash2 className="w-3.5 h-3.5 mr-2" />
-                            Delete Project
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
+                    {/* Dropdown removed per user request */}
                   </div>
 
                   <p className="text-sm text-muted-foreground mb-6 line-clamp-3 min-h-[3rem]">{project.description}</p>
@@ -226,43 +235,54 @@ const Projects = () => {
         </>
       )}
 
-      <CrudDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        title={editingId ? "Edit Project" : "Create Project"}
-        subtitle={editingId ? "Modify project information" : "Start a new collaboration space"}
-        icon={<FolderKanban className="w-5 h-5" />}
-        onSave={handleSave}
-        saveLabel={editingId ? "Update Project" : "Create Project"}
-      >
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <FormField label="Project Name" icon={FolderKanban} required error={errors.name}>
-              <input className={cn("premium-input", errors.name && "!border-destructive focus:ring-destructive/20")}
-                placeholder="Enter project name..." value={editData.name || ""} onChange={e => { setEditData(d => ({ ...d, name: e.target.value })); setErrors(p => ({ ...p, name: "" })); }} />
-            </FormField>
-            <FormField label="Client" icon={Building2} required error={errors.client}>
-              <input className={cn("premium-input", errors.client && "!border-destructive focus:ring-destructive/20")}
-                placeholder="Client or company name..." value={editData.client || ""} onChange={e => { setEditData(d => ({ ...d, client: e.target.value })); setErrors(p => ({ ...p, client: "" })); }} />
-            </FormField>
-          </div>
-          <FormField label="Description" icon={FileText} required error={errors.description}>
-            <textarea className={cn("premium-input min-h-[100px] resize-none", errors.description && "!border-destructive focus:ring-destructive/20")}
-              placeholder="Brief project description..." rows={3} value={editData.description || ""} onChange={e => { setEditData(d => ({ ...d, description: e.target.value })); setErrors(p => ({ ...p, description: "" })); }} />
-          </FormField>
-          <FormField label="Members" icon={Users}>
-            <MemberSelector
-              variant="projects"
-              showSelf={false}
-              showTeam={false}
-              selected={editData.members || []}
-              onChange={members => setEditData(d => ({ ...d, members }))}
-            />
-          </FormField>
-        </div>
-      </CrudDialog>
+      {/* Backdrop Overlay */}
+      <AnimatePresence>
+        {(dialogOpen || descriptionTarget) && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => {
+              setDescriptionTarget(null);
+              setDialogOpen(false);
+            }}
+            className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-40"
+          />
+        )}
+      </AnimatePresence>
 
-      <DeleteDialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={() => { }} itemName={deleteTarget?.name || "project"} />
+      {/* Sidebars */}
+      <AnimatePresence mode="popLayout">
+        {descriptionTarget && (
+          <ProjectDetailView
+            key={`detail-${descriptionTarget.id}`}
+            project={descriptionTarget}
+            onClose={() => setDescriptionTarget(null)}
+            onEdit={(p) => openEdit(p)}
+            onDelete={(p) => setDeleteTarget(p)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence mode="popLayout">
+        {dialogOpen && (
+          <ProjectSidebarForm
+            key="project-form"
+            open={dialogOpen}
+            onClose={() => setDialogOpen(false)}
+            title={editingId ? "Edit Project" : "Create Project"}
+            subtitle={editingId ? "Modify project information" : "Start a new collaboration space"}
+            onSave={handleSave}
+            editData={editData}
+            setEditData={setEditData}
+            errors={errors}
+            setErrors={setErrors}
+            isEditing={!!editingId}
+          />
+        )}
+      </AnimatePresence>
+
+      <DeleteDialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} itemName={deleteTarget?.name || "project"} />
     </AppLayout>
   );
 };

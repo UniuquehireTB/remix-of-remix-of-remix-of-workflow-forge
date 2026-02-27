@@ -19,7 +19,7 @@ export const apiService = {
 
         const data = await response.json();
 
-        if (response.status === 401 || response.status === 403) {
+        if (response.status === 401) {
             // Only redirect if we're not already trying to login
             if (!endpoint.includes('/auth/login')) {
                 sessionStorage.removeItem('token');
@@ -90,6 +90,9 @@ export const projectService = {
     },
     update: async (id: number, projectData: any) => {
         return apiService.put(`/projects/${id}`, projectData);
+    },
+    delete: async (id: number) => {
+        return apiService.delete(`/projects/${id}`);
     }
 };
 
@@ -101,14 +104,14 @@ export const ticketService = {
         const query = new URLSearchParams(filteredParams as any).toString();
         return apiService.get(`/tickets?${query}`);
     },
+    getById: async (id: number) => {
+        return apiService.get(`/tickets/${id}`);
+    },
     create: async (ticketData: any) => {
         return apiService.post('/tickets', ticketData);
     },
     updateStatus: async (id: number, status: string) => {
         return apiService.put(`/tickets/${id}/status`, { status });
-    },
-    updateRemarks: async (id: number, remarks: string) => {
-        return apiService.put(`/tickets/${id}/remarks`, { remarks });
     },
     update: async (id: number, ticketData: any) => {
         return apiService.put(`/tickets/${id}`, ticketData);
@@ -119,7 +122,7 @@ export const ticketService = {
 };
 
 export const noteService = {
-    getAll: async (params: { search?: string, type?: string, projectId?: any, page?: number, limit?: number }) => {
+    getAll: async (params: { search?: string, type?: string, projectId?: any, filter?: string, page?: number, limit?: number }) => {
         const filteredParams = Object.fromEntries(
             Object.entries(params).filter(([_, v]) => v !== undefined && v !== null)
         );
@@ -140,6 +143,15 @@ export const noteService = {
     },
     share: async (id: number, shares: { userId: number, canEdit: boolean }[]) => {
         return apiService.post(`/notes/${id}/share`, { shares });
+    }
+};
+
+export const commentService = {
+    getAllByTicket: async (ticketId: number) => {
+        return apiService.get(`/comments/ticket/${ticketId}`);
+    },
+    create: async (ticketId: number, content: string) => {
+        return apiService.post('/comments', { ticketId, content });
     }
 };
 

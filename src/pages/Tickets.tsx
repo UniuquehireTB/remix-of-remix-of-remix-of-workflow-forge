@@ -1,26 +1,30 @@
 import { useState, useEffect } from "react";
-import { format } from "date-fns";
+import { useSearchParams } from "react-router-dom";
+import { format, differenceInHours, isPast } from "date-fns";
 import { AppLayout } from "@/components/AppLayout";
-import { Plus, Pencil, Trash2, MoreHorizontal, Bug, AlertCircle, Calendar, FileText, Users, ArrowRight, MessageSquare, Eye, Check, X, UserIcon, Shield } from "lucide-react";
+import {
+  Plus, Pencil, Trash2, Bug, AlertCircle, Calendar,
+  Users, MessageSquare, Check, X, User as UserIcon, ChevronDown, CheckCircle2
+} from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { SearchBar } from "@/components/SearchBar";
 import { PaginationControls } from "@/components/PaginationControls";
-import { CrudDialog, DeleteDialog } from "@/components/CrudDialog";
+import { DeleteDialog } from "@/components/CrudDialog";
 import { FormField } from "@/components/FormField";
 import { MemberSelector } from "@/components/MemberSelector";
-import { FilterDropdown } from "@/components/AnimatedDropdown";
-import { AnimatedDropdown } from "@/components/AnimatedDropdown";
+import { AnimatedDropdown, FilterDropdown } from "@/components/AnimatedDropdown";
 import { AnimatedDatePicker } from "@/components/AnimatedDatePicker";
-import { statusColors, priorityColors } from "@/lib/data";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { ProjectTabs } from "@/components/ProjectTabs";
 import { ticketService, projectService, authService } from "@/services/authService";
+import { TicketDetailView } from "@/components/TicketDetailView";
+import { TicketSidebarForm } from "@/components/TicketSidebarForm";
+import React from "react";
 
 const PAGE_SIZE = 10;
 const allStatuses = ["All", "Open", "In Progress", "On Hold", "Closed"];
@@ -42,7 +46,6 @@ interface Ticket {
   startDate: string;
   endDate: string;
   closedAt: string;
-  remarks: string;
   assignees: any[];
 }
 
@@ -85,12 +88,19 @@ const Tickets = () => {
   const [manualCloseDate, setManualCloseDate] = useState(new Date().toISOString().split('T')[0]);
   const [editData, setEditData] = useState<Partial<Ticket>>(emptyTicket());
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [remarkTarget, setRemarkTarget] = useState<number | null>(null);
-  const [remarkText, setRemarkText] = useState("");
+  const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [descriptionTarget, setDescriptionTarget] = useState<Ticket | null>(null);
   const [showFullDesc, setShowFullDesc] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (descriptionTarget) {
+      const updated = tickets.find(t => t.id === descriptionTarget.id);
+      if (updated) {
+        setDescriptionTarget(updated);
+      }
+    }
+  }, [tickets]);
 
   const fetchTickets = async () => {
     setLoading(true);
@@ -142,6 +152,22 @@ const Tickets = () => {
     fetchProjects();
     fetchMembers();
   }, []);
+
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const tid = searchParams.get("ticketId");
+    if (tid) {
+      const loadTargetTicket = async () => {
+        try {
+          const t = await ticketService.getById(parseInt(tid));
+          setDescriptionTarget(t);
+        } catch (err) {
+          console.error("Failed to load ticket from URL", err);
+        }
+      };
+      loadTargetTicket();
+    }
+  }, [searchParams]);
 
   // Instant reactive validation for dates
   useEffect(() => {
@@ -314,6 +340,14 @@ const Tickets = () => {
       if (editingId) {
         await ticketService.update(editingId, payload);
         toast({ title: "✅ Ticket Updated", description: `${editData.title} has been updated.` });
+
+        // Update descriptionTarget manually in case it's filtered out of the list refresh
+        if (descriptionTarget?.id === editingId) {
+          // We can't easily reconstruct the full ticket from payload (missing ticketId etc)
+          // so we fetch the updated list and wait for useEffect, 
+          // but if we want to be safe for filtered cases, we could combine prev with payload.
+          setDescriptionTarget(prev => prev ? ({ ...prev, ...payload }) : null);
+        }
       } else {
         await ticketService.create(payload);
         toast({ title: "🎉 Ticket Raised", description: `${editData.title} has been created.` });
@@ -357,6 +391,10 @@ const Tickets = () => {
         setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: newStatus, closedAt: null } : t));
       }
 
+      if (descriptionTarget?.id === ticketId) {
+        setDescriptionTarget(prev => prev ? ({ ...prev, status: newStatus, closedAt: null }) : null);
+      }
+
       toast({ title: "Status Changed", description: `Ticket moved to ${newStatus}` });
     } catch (err) {
       toast({ title: "❌ Error", description: "Failed to update status", variant: "destructive" });
@@ -383,6 +421,10 @@ const Tickets = () => {
         setTickets(prev => prev.map(t => t.id === closeTarget.id ? { ...t, status: "Closed", closedAt: manualCloseDate } : t));
       }
 
+      if (descriptionTarget?.id === closeTarget.id) {
+        setDescriptionTarget(prev => prev ? ({ ...prev, status: "Closed", closedAt: manualCloseDate }) : null);
+      }
+
       toast({ title: "✅ Ticket Closed", description: `Closed date: ${manualCloseDate}` });
       setCloseTarget(null);
     } catch (err) {
@@ -390,19 +432,6 @@ const Tickets = () => {
     }
   };
 
-  const saveRemark = async () => {
-    if (remarkTarget) {
-      try {
-        await ticketService.updateRemarks(remarkTarget, remarkText);
-        setTickets(prev => prev.map(t => t.id === remarkTarget ? { ...t, remarks: remarkText } : t));
-        toast({ title: "✅ Remark Saved" });
-      } catch (err) {
-        toast({ title: "❌ Error", description: "Failed to save remark", variant: "destructive" });
-      }
-    }
-    setRemarkTarget(null);
-    setRemarkText("");
-  };
 
   const typeColor: Record<string, string> = {
     Bug: "bg-destructive/10 text-destructive border-destructive/20",
@@ -419,506 +448,387 @@ const Tickets = () => {
         onChange={v => { setProjectFilter(v); setPage(1); }}
       />
 
-      <div className="flex flex-col gap-4 mb-6">
-        {/* Primary Row: Status + Search + Action */}
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
-          <div className="flex bg-muted/20 p-1 rounded-xl border border-border/40 w-full lg:w-auto h-10 overflow-x-auto scrollbar-hide">
-            {allStatuses.map((s) => {
-              const active = statusFilter === s;
-              return (
-                <button
-                  key={s}
-                  onClick={() => { setStatusFilter(s); setPage(1); }}
-                  className={cn(
-                    "relative px-5 py-1 text-xs font-bold transition-all duration-300 rounded-lg whitespace-nowrap flex-1 lg:flex-none",
-                    active ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <span className="relative z-10">{s}</span>
-                  {active && (
-                    <motion.div
-                      layoutId="activeStatus"
-                      className="absolute inset-0 bg-primary rounded-lg"
-                      transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="flex items-center gap-2 w-full lg:w-auto h-10">
-            <SearchBar
-              value={search}
-              onChange={v => { setSearch(v); setPage(1); }}
-              placeholder="Search tickets..."
-              className="flex-1 lg:w-64 h-full"
-              inputClassName="h-full !py-0 !rounded-xl bg-muted/20"
-            />
-            <Button onClick={openCreate} className="gap-2 rounded-xl px-5 h-full shrink-0 bg-primary hover:bg-primary/90 text-white border-none shadow-none">
-              <Plus className="w-4 h-4" />
-              <span className="font-bold text-xs">Rise Ticket</span>
-            </Button>
-          </div>
-        </div>
-
-        {/* Secondary Row: Specific Filters */}
-        <div className="flex flex-wrap items-center gap-3 bg-muted/20 border border-border/80 rounded-xl p-3">
-          <div className="flex items-center gap-2">
-            <FilterDropdown
-              options={allTypes}
-              value={typeFilter}
-              onChange={v => { setTypeFilter(v); setPage(1); }}
-              allLabel="All Types"
-              triggerClassName="border-border/80 !border-2 !rounded-lg h-9 bg-background text-xs font-semibold shadow-none"
-            />
-            <FilterDropdown
-              options={allPriorities}
-              value={priorityFilter}
-              onChange={v => { setPriorityFilter(v); setPage(1); }}
-              allLabel="All Priorities"
-              triggerClassName="border-border/80 !border-2 !rounded-lg h-9 bg-background text-xs font-semibold shadow-none"
-            />
-          </div>
-
-          <div className="h-5 w-px bg-border/60 mx-1 hidden sm:block" />
-
-          <div className="flex flex-wrap items-center gap-3 flex-1">
-            {/* Member filter: only visible to privileged roles */}
-            {isPrivileged && (
-              <div className="flex items-center gap-2">
-                <div className="relative min-w-[170px] max-w-[220px]">
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 z-10 pointer-events-none">
-                    <Users className="w-4 h-4" />
-                  </div>
-                  <AnimatedDropdown
-                    size="sm"
-                    options={[
-                      { label: "All Members", value: "All" },
-                      ...members.map(m => ({ label: m.username, value: m.id.toString() }))
-                    ]}
-                    value={employeeFilter}
-                    onChange={v => { setEmployeeFilter(v); setPage(1); }}
-                    placeholder="Select Member"
-                    className="w-full"
-                    triggerClassName="pl-9 border-border/80 !border-2 !rounded-lg h-9 bg-background text-xs font-semibold shadow-none"
-                  />
+      <div className="flex gap-0 h-full overflow-hidden">
+        {/* Main List Area */}
+        <div className="flex-1 transition-all duration-300 ease-in-out overflow-y-auto premium-scrollbar pr-1">
+          <div className="flex flex-col gap-4 mb-4">
+            {/* Primary Row: Status + Search + Action */}
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-4 py-1">
+              <div className="flex items-center gap-4 w-full lg:w-auto">
+                <div className="flex bg-muted/30 p-1 rounded-xl border border-border/50 h-9 items-center overflow-x-auto scrollbar-hide">
+                  {allStatuses.map((s) => {
+                    const active = statusFilter === s;
+                    return (
+                      <button
+                        key={s}
+                        onClick={() => { setStatusFilter(s); setPage(1); }}
+                        className={cn(
+                          "relative px-3.5 py-1 text-[11px] font-bold transition-all duration-300 rounded-lg whitespace-nowrap flex-1 lg:flex-none h-7 flex items-center justify-center",
+                          active ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        <span className="relative z-10">{s}</span>
+                        {active && (
+                          <motion.div
+                            layoutId="activeStatus"
+                            className="absolute inset-0 bg-primary rounded-lg shadow-sm"
+                            transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
+                          />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
 
-                {/* My Tickets Button — only for privileged roles */}
-                <button
-                  onClick={() => { setEmployeeFilter(currentUser?.id?.toString() ?? "All"); setPage(1); }}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 h-9 rounded-lg text-[11px] font-bold transition-all border-2",
-                    employeeFilter === currentUser?.id?.toString()
-                      ? "bg-primary/10 border-primary text-primary"
-                      : "bg-background border-border/80 text-muted-foreground hover:border-primary/30 hover:text-foreground"
-                  )}
+                <div className="hidden sm:flex items-center gap-2">
+                  <FilterDropdown
+                    options={allTypes}
+                    value={typeFilter}
+                    onChange={v => { setTypeFilter(v); setPage(1); }}
+                    allLabel="All Types"
+                    triggerClassName="border-border/50 border !rounded-xl h-9 !bg-transparent text-xs font-bold shadow-none min-w-[120px] px-4"
+                  />
+                  <FilterDropdown
+                    options={allPriorities}
+                    value={priorityFilter}
+                    onChange={v => { setPriorityFilter(v); setPage(1); }}
+                    allLabel="All Priorities"
+                    triggerClassName="border-border/50 border !rounded-xl h-9 !bg-transparent text-xs font-bold shadow-none min-w-[120px] px-4"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full lg:w-auto">
+                <div className="flex-1 lg:w-64 flex bg-muted/30 p-1 rounded-xl border border-border/50 h-9 transition-all duration-200 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary focus-within:bg-card">
+                  <SearchBar
+                    value={search}
+                    onChange={v => { setSearch(v); setPage(1); }}
+                    placeholder="Search tickets..."
+                    className="w-full h-full"
+                    inputClassName="h-full !py-0 !rounded-lg !bg-transparent border-none focus:ring-0 shadow-none"
+                  />
+                </div>
+                <Button
+                  onClick={openCreate}
+                  className="gap-2 rounded-xl px-5 h-9 shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground border-none shadow-sm transition-all"
                 >
-                  <UserIcon className="w-3.5 h-3.5" />
-                  <span className="whitespace-nowrap">My Tickets</span>
-                  {employeeFilter === currentUser?.id?.toString() && (
-                    <motion.div layoutId="activeDot" className="w-1 h-1 rounded-full bg-primary" />
+                  <Plus className="w-4 h-4" />
+                  <span className="font-bold text-xs">Rise Ticket</span>
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Member filter: only visible to privileged roles */}
+              {isPrivileged && (
+                <div className="flex items-center gap-2">
+                  <div className="flex !bg-transparent px-1 rounded-xl border border-border h-9 items-center group">
+                    <AnimatedDropdown
+                      size="sm"
+                      options={[
+                        { label: "Everyone", value: "All" },
+                        ...members.map(m => ({ label: m.username, value: m.id.toString() }))
+                      ]}
+                      value={employeeFilter}
+                      onChange={v => { setEmployeeFilter(v); setPage(1); }}
+                      placeholder="Select Member"
+                      className="min-w-[140px]"
+                      triggerClassName="border-none !h-7 !bg-transparent text-xs font-bold shadow-none !px-3"
+                    />
+                    <div className="w-px h-4 bg-border/40" />
+                    <button
+                      onClick={() => { setEmployeeFilter(currentUser?.id?.toString() ?? "All"); setPage(1); }}
+                      className={cn(
+                        "relative px-4 h-7 text-xs font-bold transition-all duration-300 rounded-lg whitespace-nowrap ml-1",
+                        employeeFilter === currentUser?.id?.toString()
+                          ? "text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <span className="relative z-10">My Tickets</span>
+                      {employeeFilter === currentUser?.id?.toString() && (
+                        <motion.div
+                          layoutId="activeEmployee"
+                          className="absolute inset-0 bg-primary rounded-lg shadow-sm"
+                          transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
+                        />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Date Filter */}
+              <div className="flex items-center gap-2">
+                <div className="flex !bg-transparent px-1 rounded-xl border border-border h-9 items-center">
+                  <div className="flex items-center gap-2 px-3 h-7">
+                    <AnimatedDatePicker
+                      value={startDateFilter}
+                      onChange={v => { setStartDateFilter(v); setPage(1); }}
+                      className="border-none !p-0"
+                      triggerClassName="border-none !p-0 !h-auto bg-transparent shadow-none hover:bg-transparent !ring-0 text-xs font-bold"
+                      placeholder="Start Date"
+                    />
+                  </div>
+                  <div className="w-px h-4 bg-border/40" />
+                  <div className="flex items-center gap-2 px-3 h-7">
+                    <AnimatedDatePicker
+                      value={endDateFilter}
+                      onChange={v => { setEndDateFilter(v); setPage(1); }}
+                      className="border-none !p-0"
+                      triggerClassName="border-none !p-0 !h-auto bg-transparent shadow-none hover:bg-transparent !ring-0 text-xs font-bold"
+                      placeholder="Due Date"
+                    />
+                  </div>
+                  {(startDateFilter || endDateFilter) && (
+                    <>
+                      <div className="w-px h-4 bg-border/40 mx-1" />
+                      <button
+                        onClick={() => { setStartDateFilter(""); setEndDateFilter(""); setPage(1); }}
+                        className="w-8 h-7 flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </>
                   )}
-                </button>
-
-                {/* Clear/Reset to All button — appears when not showing All Members */}
-                {employeeFilter !== "All" && (
-                  <button
-                    onClick={() => { setEmployeeFilter("All"); setPage(1); }}
-                    title="Show All Members"
-                    className="flex items-center justify-center w-7 h-7 rounded-lg bg-muted/50 hover:bg-muted text-muted-foreground transition-colors shrink-0 border border-border/40"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            )}
-
-            {isPrivileged && <div className="h-5 w-px bg-border/60 mx-1 hidden md:block" />}
-
-            <div className="flex items-center gap-3 bg-background border border-border/80 rounded-lg px-3 h-9">
-              <div className="flex items-center gap-2.5">
-                <span className="text-[10px] font-bold uppercase text-muted-foreground/40 tracking-wide">From</span>
-                <AnimatedDatePicker
-                  value={startDateFilter}
-                  onChange={v => { setStartDateFilter(v); setPage(1); }}
-                  className="border-none !p-0"
-                  triggerClassName="border-none !py-0 !pr-10 !h-auto bg-transparent shadow-none hover:bg-transparent !ring-0 text-[11px] font-bold"
-                  placeholder="Date..."
-                />
-              </div>
-              <div className="w-px h-4 bg-border/40" />
-              <div className="flex items-center gap-2.5">
-                <span className="text-[10px] font-bold uppercase text-muted-foreground/40 tracking-wide">To</span>
-                <AnimatedDatePicker
-                  value={endDateFilter}
-                  onChange={v => { setEndDateFilter(v); setPage(1); }}
-                  className="border-none !p-0"
-                  triggerClassName="border-none !py-0 !pr-10 !h-auto bg-transparent shadow-none hover:bg-transparent !ring-0 text-[11px] font-bold"
-                  placeholder="Date..."
-                />
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Table Content */}
-      <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm animate-fade-in">
-        <div className="overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: "none" }}>
-          <table className="w-full text-sm min-w-[1100px]">
-            <thead>
-              <tr className="bg-muted/30">
-                {["ID", "Title", "Type", "Priority", "Status", "Start Date", "End Date", "Closed At", "Assignees", "Remarks", "Actions"].map(h => (
-                  <th key={h} className="text-left py-3.5 px-4 font-semibold text-xs tracking-wide text-muted-foreground capitalize">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                Array(5).fill(0).map((_, idx) => (
-                  <tr key={idx} className="border-t border-border/50 animate-pulse">
-                    {Array(10).fill(0).map((__, tdIdx) => (
-                      <td key={tdIdx} className="p-4"><div className="h-4 bg-muted rounded w-full" /></td>
-                    ))}
+          {/* Table Content */}
+          <div className="animate-fade-in border border-border/60 rounded-2xl bg-card/10 shadow-sm overflow-hidden mb-6">
+            <div className="overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: "none" }}>
+              <table className="w-full text-sm min-w-[1100px]">
+                <thead>
+                  <tr className="border-b border-slate-100/60">
+                    <th className="text-left py-4 px-6 font-semibold text-[13px] text-slate-500/80 whitespace-nowrap">Ticket ID</th>
+                    <th className="text-left py-4 px-4 font-semibold text-[13px] text-slate-500/80 whitespace-nowrap">Title</th>
+                    <th className="text-left py-4 px-4 font-semibold text-[13px] text-slate-500/80 whitespace-nowrap">Type</th>
+                    <th className="text-left py-4 px-4 font-semibold text-[13px] text-slate-500/80 whitespace-nowrap">Status</th>
+                    <th className="text-left py-4 px-4 font-extrabold text-[14px] text-slate-900 whitespace-nowrap">Assignee</th>
+                    <th className="text-left py-4 px-4 font-semibold text-[13px] text-slate-500/80 whitespace-nowrap">Priority</th>
+                    <th className="text-left py-4 px-4 font-semibold text-[13px] text-slate-500/80 whitespace-nowrap">Start Date</th>
+                    <th className="text-left py-4 px-4 font-semibold text-[13px] text-slate-500/80 whitespace-nowrap">Due Date</th>
                   </tr>
-                ))
-              ) : (
-                tickets.map((t, i) => (
-                  <motion.tr
-                    key={t.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: i * 0.03 }}
-                    className="group border-t border-border/50 hover:bg-primary/[0.02] transition-colors cursor-pointer"
-                    onClick={() => setDescriptionTarget(t)}
-                  >
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-1.5 h-6 bg-primary/20 rounded-full" />
-                        <span className="font-mono text-[11px] text-primary font-bold tracking-tighter">{t.ticketId}</span>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4 max-w-[240px]">
-                      <div className="flex flex-col">
-                        <span className="font-bold text-foreground">{t.title.length > 16 ? t.title.slice(0, 16) + "..." : t.title}</span>
-                        <span className="text-[10px] text-muted-foreground/70 font-medium mt-0.5">{t.description.length > 25 ? t.description.slice(0, 25) + "..." : t.description}</span>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <Badge variant="outline" className={cn("text-[10px] font-bold px-2 py-0.5 rounded-md border whitespace-nowrap", typeColor[t.type])}>
-                        {typeIcons[t.type]} {t.type}
-                      </Badge>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className={cn("text-xs font-bold flex items-center gap-1 whitespace-nowrap", priorityColors[t.priority])}>
-                        <span className={cn("w-2 h-2 rounded-full",
-                          t.priority === "Critical" ? "bg-destructive" :
-                            t.priority === "High" ? "bg-primary" :
-                              t.priority === "Medium" ? "bg-warning" : "bg-muted-foreground"
-                        )} />
-                        {t.priority}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4" onClick={e => e.stopPropagation()}>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button className={cn("text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all hover:ring-2 hover:ring-primary/20 whitespace-nowrap", statusColors[t.status])}>
-                            {t.status}
-                            <ArrowRight className="w-3 h-3 opacity-50" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="rounded-xl min-w-[160px] bg-popover border border-border shadow-xl z-50">
-                          <DropdownMenuLabel className="text-[10px] tracking-wider capitalize">Change Status</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          {allStatuses.filter(s => s !== "All").map(s => (
-                            <DropdownMenuItem key={s} onClick={() => changeStatus(t.id, s)} className={cn("text-xs font-medium", t.status === s && "bg-primary/10 text-primary")}>
-                              {s} {t.status === s && <span className="ml-auto text-[10px]">✓</span>}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                    <td className="py-3.5 px-4 text-xs text-muted-foreground whitespace-nowrap">
-                      <div className="flex flex-col gap-1">
-                        <span>{t.startDate ? new Date(t.startDate).toLocaleDateString() : "—"}</span>
-                        {(() => {
-                          const collabDates = t.assignees?.filter(a => a.TicketAssignee?.joinDate && a.TicketAssignee.joinDate !== t.startDate);
-                          if (!collabDates || collabDates.length === 0) return null;
-                          return (
-                            <div className="flex flex-col gap-1 mt-1">
-                              {collabDates.map((a, i) => (
-                                <div key={i} className="flex items-center gap-1.5 px-1.5 py-0.5 bg-indigo-500/5 rounded-md border-l-2 border-indigo-500/40 text-[8px] font-black text-indigo-500 animate-in fade-in slide-in-from-left-1 duration-300">
-                                  <Shield className="w-2.5 h-2.5 opacity-70" />
-                                  <span className="uppercase tracking-tight">{a.username.split(' ')[0]} / {new Date(a.TicketAssignee.joinDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4 text-xs font-bold whitespace-nowrap">
-                      {(() => {
-                        if (!t.endDate) return <span className="text-muted-foreground">—</span>;
-                        const end = new Date(t.endDate);
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        const endDay = new Date(end);
-                        endDay.setHours(0, 0, 0, 0);
-
-                        const isOverdue = today > endDay;
-                        const isDueToday = today.getTime() === endDay.getTime();
-
-                        if (isOverdue && t.status !== "Closed") {
-                          return <span className="text-destructive flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {end.toLocaleDateString()}</span>;
-                        }
-                        if (isDueToday && t.status !== "Closed") {
-                          return <span className="text-orange-500 animate-pulse flex items-center gap-1"><Calendar className="w-3 h-3" /> {end.toLocaleDateString()}</span>;
-                        }
-                        return <span className="text-muted-foreground">{end.toLocaleDateString()}</span>;
-                      })()}
-                    </td>
-                    <td className="py-3.5 px-4 text-xs font-bold text-success/70 whitespace-nowrap">
-                      {t.closedAt ? new Date(t.closedAt).toLocaleDateString() : "—"}
-                    </td>
-                    <td className="py-3.5 px-4" onClick={e => e.stopPropagation()}>
-                      <div className="flex -space-x-1.5 overflow-hidden">
-                        {t.assignees?.map((a, idx) => {
-                          const isSelf = a.id === currentUser?.id;
-                          const joinDate = a.TicketAssignee?.joinDate;
-                          const isCollaborative = !!joinDate;
-                          return (
-                            <Tooltip key={idx}>
-                              <TooltipTrigger asChild>
-                                <div className={cn(
-                                  "w-7 h-7 rounded-lg border-2 flex items-center justify-center text-[9px] font-black transition-transform hover:scale-110 hover:z-20 cursor-help",
-                                  isCollaborative
-                                    ? "bg-indigo-600 text-white border-white shadow-lg shadow-indigo-500/20 ring-1 ring-indigo-500/30"
-                                    : isSelf
-                                      ? "bg-primary text-white border-white shadow-md ring-1 ring-primary/30"
-                                      : "bg-muted text-muted-foreground border-card bg-gradient-to-br from-muted to-muted/50"
-                                )}>
-                                  {a.username.slice(0, 2).toUpperCase()}
-                                </div>
-                              </TooltipTrigger>
-                              <TooltipContent side="top" className="bg-popover/90 backdrop-blur-md border-border p-2 rounded-xl">
-                                <div className="space-y-1">
-                                  <p className="text-[10px] font-black">{a.username}</p>
-                                  {(() => {
-                                    if (!joinDate) return null;
-                                    try {
-                                      const d = new Date(joinDate);
-                                      if (isNaN(d.getTime())) return null;
-                                      return (
-                                        <p className="text-[9px] font-bold text-indigo-400 flex items-center gap-1">
-                                          <Shield className="w-3 h-3" />
-                                          Collaborate Start: {format(d, "MMM d, yyyy")}
-                                        </p>
-                                      );
-                                    } catch { return null; }
-                                  })()}
-                                </div>
-                              </TooltipContent>
-                            </Tooltip>
-                          );
-                        })}
-                        {(!t.assignees || t.assignees.length === 0) && (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4" onClick={e => e.stopPropagation()}>
-                      <button
-                        onClick={() => { setRemarkTarget(t.id); setRemarkText(t.remarks || ""); }}
-                        className={cn(
-                          "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all border",
-                          t.remarks
-                            ? "bg-primary/5 text-primary border-primary/10 hover:bg-primary/10"
-                            : "bg-muted/30 text-muted-foreground/60 border-transparent hover:border-border hover:text-foreground"
-                        )}
+                </thead>
+                <tbody>
+                  {loading ? (
+                    Array(5).fill(0).map((_, idx) => (
+                      <tr key={idx} className="border-t border-slate-50 animate-pulse">
+                        {Array(8).fill(0).map((__, tdIdx) => (
+                          <td key={tdIdx} className="p-4"><div className="h-4 bg-slate-50 rounded w-full" /></td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : (
+                    tickets.map((t, i) => (
+                      <motion.tr
+                        key={t.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: i * 0.03 }}
+                        className="group border-t border-border/50 hover:bg-primary/[0.02] transition-colors cursor-pointer"
+                        onClick={() => setDescriptionTarget(t)}
                       >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        <span className="truncate max-w-[100px]">{t.remarks || "Add Remark"}</span>
-                      </button>
-                    </td>
-                    <td className="py-3.5 px-4" onClick={e => e.stopPropagation()}>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted transition-colors">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="rounded-[20px] p-1.5 min-w-[160px] bg-popover/90 backdrop-blur-md border border-border shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-200">
-                          <DropdownMenuItem onClick={() => setDescriptionTarget(t)} className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold cursor-pointer hover:bg-primary/5">
-                            <Eye className="w-4 h-4 text-primary" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator className="my-1 bg-border/40" />
-                          <DropdownMenuItem onClick={() => openEdit(t)} className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold cursor-pointer hover:bg-primary/5">
-                            <Pencil className="w-4 h-4 text-primary" />
-                            Edit Ticket
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-destructive cursor-pointer hover:bg-destructive/5" onClick={() => setDeleteTarget(t)}>
-                            <Trash2 className="w-4 h-4" />
-                            Delete Ticket
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </motion.tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {!loading && tickets.length === 0 && (
-        <div className="text-center py-16 animate-fade-in">
-          <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-            <Bug className="w-8 h-8 text-muted-foreground" />
+                        <td className="py-4 px-6">
+                          <span className="text-[12px] text-slate-400 font-medium tracking-tight whitespace-nowrap">{t.ticketId}</span>
+                        </td>
+                        <td className="py-4 px-4 min-w-[200px]">
+                          <span className="font-medium text-[14px] text-slate-800 tracking-tight">{t.title}</span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className={cn("text-[11px] font-bold px-2 py-1 rounded border whitespace-nowrap uppercase tracking-tighter",
+                            t.type === "Bug" ? "bg-red-50 text-red-500 border-red-100" :
+                              t.type === "Feature" ? "bg-blue-50 text-blue-500 border-blue-100" :
+                                t.type === "Task" ? "bg-slate-50 text-slate-500 border-slate-100" :
+                                  "bg-amber-50 text-amber-600 border-amber-100"
+                          )}>
+                            {t.type}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-2">
+                            <span className={cn("w-2 h-2 rounded-full",
+                              t.status === "Closed" ? "bg-emerald-500" :
+                                t.status === "In Progress" ? "bg-blue-500" :
+                                  t.status === "On Hold" ? "bg-amber-500" : "bg-slate-300"
+                            )} />
+                            <span className="text-[13px] font-medium text-slate-600 whitespace-nowrap">{t.status}</span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex -space-x-2 items-center">
+                            {t.assignees && t.assignees.length > 0 ? (
+                              <>
+                                <TooltipProvider delayDuration={0}>
+                                  {t.assignees.map((a: any, idx: number) => {
+                                    const isMe = Number(a.id) === Number(currentUser?.id);
+                                    return (
+                                      <Tooltip key={idx}>
+                                        <TooltipTrigger asChild>
+                                          <div
+                                            className={cn(
+                                              "w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold border-[1.5px] transition-transform hover:scale-110 cursor-help",
+                                              isMe ? "bg-primary text-white z-10 border-primary shadow-sm" : "bg-slate-50 text-slate-500 z-0 border-slate-300"
+                                            )}
+                                          >
+                                            {a.username.slice(0, 1).toUpperCase()}
+                                          </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" className="bg-white text-slate-600 border border-slate-200 py-1.5 px-3 text-[11px] font-bold rounded-lg shadow-xl mb-1">
+                                          <p>{a.username}</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    );
+                                  })}
+                                </TooltipProvider>
+                              </>
+                            ) : (
+                              <span className="text-[12px] text-slate-300 italic whitespace-nowrap">Unassigned</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-2">
+                            <span className={cn("w-2 h-2 rounded-full",
+                              t.priority === "Critical" ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.2)]" :
+                                t.priority === "High" ? "bg-orange-500" :
+                                  t.priority === "Medium" ? "bg-amber-400" : "bg-blue-400"
+                            )} />
+                            <span className="text-[13px] font-medium text-slate-600 whitespace-nowrap">{t.priority}</span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[13px] font-medium text-slate-400 whitespace-nowrap">{t.startDate ? format(new Date(t.startDate), "MMM d, yyyy") : "—"}</span>
+                              {(() => {
+                                const collabDates = t.assignees?.filter(a => a.TicketAssignee?.joinDate && a.TicketAssignee.joinDate !== t.startDate);
+                                if (!collabDates || collabDates.length === 0) return null;
+                                return (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <div className="cursor-help flex items-center justify-center p-1 hover:bg-indigo-50 rounded-sm transition-colors">
+                                          <Users className="w-3.5 h-3.5 text-indigo-400" />
+                                        </div>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" className="p-2 min-w-[150px] rounded-xl border-indigo-100 shadow-xl">
+                                        <div className="space-y-1.5">
+                                          <p className="text-[10px] font-bold text-indigo-500 tracking-tight mb-1 border-b border-indigo-50 pb-1">Collaborative Join Dates</p>
+                                          {collabDates.map((a, i) => (
+                                            <div key={i} className="flex items-center justify-between gap-4">
+                                              <span className="text-[11px] font-bold text-slate-600">{a.username}</span>
+                                              <span className="text-[11px] font-medium text-slate-400">{format(new Date(a.TicketAssignee.joinDate), "MMM d")}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className={cn("text-[13px] font-semibold tracking-tight whitespace-nowrap",
+                            (() => {
+                              if (!t.endDate) return "text-slate-400";
+                              const dueDate = new Date(t.endDate);
+                              if (isPast(dueDate)) return "text-red-500";
+                              if (differenceInHours(dueDate, new Date()) <= 12) return "text-orange-500";
+                              return "text-slate-400";
+                            })()
+                          )}>
+                            {t.endDate ? format(new Date(t.endDate), "MMM d, yyyy") : "—"}
+                          </span>
+                        </td>
+                      </motion.tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <p className="text-muted-foreground font-medium">No tickets found</p>
-        </div>
-      )}
 
-      {!loading && tickets.length > 0 && (
-        <div className="mt-6">
-          <PaginationControls
-            page={page}
-            totalPages={pagination.totalPages}
-            onPageChange={setPage}
-            totalItems={pagination.totalItems}
-            pageSize={PAGE_SIZE}
-          />
-        </div>
-      )}
+          {!loading && tickets.length === 0 && (
+            <div className="text-center py-16 animate-fade-in">
+              <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                <Bug className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <p className="text-muted-foreground font-medium">No tickets found</p>
+            </div>
+          )}
 
-      {/* Rise Ticket Form */}
-      <CrudDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        title={editingId ? "Edit Ticket" : "Rise Ticket"}
-        subtitle={editingId ? "Update ticket details" : "Create a new support or task ticket"}
-        icon={<Bug className="w-5 h-5" />}
-        onSave={handleSave}
-        saveLabel={editingId ? "Update Ticket" : "Rise Ticket"}
-        size="lg"
-      >
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormField label="Title" icon={Bug} required error={errors.title}>
-            <input className={cn("premium-input", errors.title && "!border-destructive focus:ring-destructive/20")}
-              placeholder="What's the issue?" value={editData.title || ""} onChange={e => { setEditData(d => ({ ...d, title: e.target.value })); setErrors(p => ({ ...p, title: "" })); }} />
-          </FormField>
-          <FormField label="Project" icon={FileText} required>
-            <AnimatedDropdown
-              options={[{ label: "General", value: "" }, ...projects.map(p => ({ label: p.name, value: p.id.toString() }))]}
-              value={editData.projectId?.toString() || ""}
-              onChange={v => {
-                const newProjectId = v ? parseInt(v) : null;
-                const projectMembers = projects.find(p => p.id === newProjectId)?.members?.map((m: any) => m.id) || [];
+          {!loading && tickets.length > 0 && (
+            <div className="mt-6">
+              <PaginationControls
+                page={page}
+                totalPages={pagination.totalPages}
+                onPageChange={setPage}
+                totalItems={pagination.totalItems}
+                pageSize={PAGE_SIZE}
+              />
+            </div>
+          )}
 
-                setEditData(d => ({
-                  ...d,
-                  projectId: newProjectId,
-                  // If project is set, filter out assignees not in that project
-                  assignees: newProjectId
-                    ? d.assignees?.filter(id => projectMembers.includes(id))
-                    : d.assignees
-                }));
+        </div>
+
+        {/* Sidebar Overlay/Drawer Backdrop */}
+        <AnimatePresence>
+          {(descriptionTarget || dialogOpen) && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setDescriptionTarget(null);
+                setDialogOpen(false);
               }}
-              placeholder="Select project"
+              className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-40"
             />
-          </FormField>
-        </div>
-        <FormField label="Description" icon={FileText} required error={errors.description}>
-          <textarea className={cn("premium-input min-h-[80px] resize-none", errors.description && "!border-destructive focus:ring-destructive/20")}
-            placeholder="Describe the issue in detail..." rows={3} value={editData.description || ""} onChange={e => { setEditData(d => ({ ...d, description: e.target.value })); setErrors(p => ({ ...p, description: "" })); }} />
-        </FormField>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormField label="Type" icon={Bug} required error={errors.type}>
-            <AnimatedDropdown
-              options={allTypes.map(t => ({ label: t, value: t }))}
-              value={editData.type || ""}
-              onChange={v => { setEditData(d => ({ ...d, type: v as any })); setErrors(p => ({ ...p, type: "" })); }}
-              placeholder="Select Type *"
-              error={!!errors.type}
+          )}
+        </AnimatePresence>
+
+        {/* Right Sidebar Form Panel (Edit/Rise) */}
+        <AnimatePresence mode="wait">
+          {dialogOpen && (
+            <TicketSidebarForm
+              key="ticket-form"
+              open={dialogOpen}
+              onClose={() => setDialogOpen(false)}
+              title={editingId ? "Edit Ticket" : "Rise Ticket"}
+              subtitle={editingId ? "Update ticket details" : "Create a new support or task ticket"}
+              onSave={handleSave}
+              editData={editData}
+              setEditData={setEditData}
+              projects={projects}
+              errors={errors}
+              setErrors={setErrors}
+              isEditing={!!editingId}
             />
-          </FormField>
-          <FormField label="Priority" icon={AlertCircle} required error={errors.priority}>
-            <AnimatedDropdown
-              options={allPriorities.map(p => ({ label: p, value: p }))}
-              value={editData.priority || ""}
-              onChange={v => { setEditData(d => ({ ...d, priority: v as any })); setErrors(p => ({ ...p, priority: "" })); }}
-              placeholder="Select Priority *"
-              error={!!errors.priority}
-            />
-          </FormField>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormField label="Start Date" icon={Calendar} error={errors.startDate}>
-            <AnimatedDatePicker
-              value={editData.startDate || ""}
-              onChange={v => {
-                setEditData(d => {
-                  const hasAssigneeDate = d.assignees?.some(a => typeof a === 'object' && a.joinDate);
-                  const willHaveNoDates = !v && !hasAssigneeDate;
-                  return {
-                    ...d,
-                    startDate: v,
-                    endDate: willHaveNoDates ? "" : d.endDate
-                  };
-                });
+          )}
+        </AnimatePresence>
+
+        {/* Right Sidebar Detail Panel */}
+        <AnimatePresence mode="wait">
+          {descriptionTarget && (
+            <TicketDetailView
+              key="ticket-detail"
+              ticket={descriptionTarget}
+              projects={projects}
+              onClose={() => setDescriptionTarget(null)}
+              onUpdateStatus={changeStatus}
+              onEdit={(t) => {
+                openEdit(t);
               }}
-              error={!!errors.startDate}
-              placeholder="Select start date"
-              showIcon={false}
+              onDelete={setDeleteTarget}
             />
-          </FormField>
-          <FormField label="End Date" icon={Calendar} error={errors.endDate}>
-            <AnimatedDatePicker
-              value={editData.endDate || ""}
-              onChange={v => {
-                setEditData(d => ({ ...d, endDate: v }));
-              }}
-              error={!!errors.endDate}
-              disabled={!editData.startDate && !editData.assignees?.some(a => typeof a === 'object' && a.joinDate)}
-              placeholder={(!editData.startDate && !editData.assignees?.some(a => typeof a === 'object' && a.joinDate)) ? "Pick Start Date first" : "Select end date"}
-              showIcon={false}
-            />
-          </FormField>
-        </div>
-        <div className="space-y-4">
-          <MemberSelector
-            label="Assignees"
-            icon={Users}
-            selected={editData.assignees || []}
-            startDate={editData.startDate}
-            endDate={editData.endDate}
-            onChange={val => {
-              setEditData(d => {
-                const hasAssigneeDate = val.some(a => typeof a === 'object' && a.joinDate);
-                const willHaveNoDates = !d.startDate && !hasAssigneeDate;
-                return {
-                  ...d,
-                  assignees: val,
-                  endDate: willHaveNoDates ? "" : d.endDate
-                };
-              });
-            }}
-            showSelf={true}
-            showTeam={true}
-            allowedMemberIds={
-              editData.projectId
-                ? (projects.find(p => p.id === editData.projectId)?.members?.map((m: any) => m.id) ?? undefined)
-                : undefined
-            }
-            error={errors.assignees}
-          />
-        </div>
-      </CrudDialog>
+          )}
+        </AnimatePresence>
+      </div>
 
       <DeleteDialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} itemName={deleteTarget?.title || "ticket"} />
 
@@ -949,207 +859,7 @@ const Tickets = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Remarks Modal */}
-      <Dialog open={!!remarkTarget} onOpenChange={v => !v && setRemarkTarget(null)}>
-        <DialogContent className="max-w-sm rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold capitalize">Add Remark</DialogTitle>
-          </DialogHeader>
-          <textarea className="premium-input min-h-[80px] resize-none" placeholder="Enter your remark..." value={remarkText} onChange={e => setRemarkText(e.target.value)} />
-          <DialogFooter className="gap-2">
-            <Button variant="ghost" onClick={() => setRemarkTarget(null)} className="rounded-xl">Cancel</Button>
-            <Button onClick={saveRemark} className="rounded-xl shadow-lg shadow-primary/25">Save Remark</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Description Detail Modal - Premium View Section */}
-      <Dialog open={!!descriptionTarget} onOpenChange={v => { if (!v) { setDescriptionTarget(null); setShowFullDesc(false); } }}>
-        <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] rounded-[32px] p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col">
-          {/* Sticky Header */}
-          <div className="shrink-0 relative">
-            <div className="h-28 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent relative overflow-hidden flex items-center px-8">
-              <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary via-transparent to-transparent" />
-              <div className="relative flex items-center gap-4 w-full">
-                <div className="w-12 h-12 rounded-2xl bg-white shadow-xl flex items-center justify-center border border-white/20 shrink-0">
-                  <Eye className="w-6 h-6 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-primary/60">Ticket Detail</span>
-                    <span className="w-1 h-1 rounded-full bg-primary/30" />
-                    <span className="text-[9px] font-mono font-bold text-primary">{descriptionTarget?.ticketId}</span>
-                  </div>
-                  <DialogTitle className="text-lg font-black tracking-tight text-foreground leading-tight truncate">
-                    {descriptionTarget?.title}
-                  </DialogTitle>
-                </div>
-              </div>
-            </div>
-
-            {/* Consolidated Minimal Status & Timeline Bar */}
-            <div className="px-8 py-1.5 bg-muted/20 border-b border-border/40 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Badge variant="outline" className={cn("text-[8px] uppercase font-black px-2 py-0.5 rounded-full tracking-wider border shadow-none bg-background/50", typeColor[descriptionTarget?.type || "Bug"])}>
-                  {typeIcons[descriptionTarget?.type || "Bug"]} {descriptionTarget?.type}
-                </Badge>
-                <Badge variant="outline" className={cn("text-[8px] uppercase font-black px-2 py-0.5 rounded-full tracking-wider border shadow-none bg-background/50", statusColors[descriptionTarget?.status || "Open"])}>
-                  {descriptionTarget?.status}
-                </Badge>
-                <Badge variant="outline" className={cn("text-[8px] uppercase font-black px-2 py-0.5 rounded-full tracking-wider border shadow-none bg-background/50 flex items-center gap-1", priorityColors[descriptionTarget?.priority || "Medium"])}>
-                  <span className={cn("w-1 h-1 rounded-full animate-pulse",
-                    descriptionTarget?.priority === "Critical" ? "bg-destructive" :
-                      descriptionTarget?.priority === "High" ? "bg-primary" :
-                        descriptionTarget?.priority === "Medium" ? "bg-warning" : "bg-muted-foreground"
-                  )} />
-                  {descriptionTarget?.priority}
-                </Badge>
-              </div>
-
-              <div className="flex items-center gap-4 text-[9px] font-bold text-muted-foreground">
-                <div className="flex items-center gap-1.5 opacity-80">
-                  <Calendar className="w-2.5 h-2.5" />
-                  <span>{descriptionTarget?.startDate ? new Date(descriptionTarget.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : "TBD"}</span>
-                  <ArrowRight className="w-2 h-2" />
-                  <span>{descriptionTarget?.endDate ? new Date(descriptionTarget.endDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : "TBD"}</span>
-                </div>
-                {descriptionTarget?.closedAt && (
-                  <div className="flex items-center gap-1.5 text-success/80 border-l border-border/60 pl-4 h-3">
-                    <Check className="w-2.5 h-2.5" />
-                    <span>Done {new Date(descriptionTarget.closedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Scrollable Content Area */}
-          <div className="flex-1 overflow-y-auto premium-scrollbar p-8 space-y-8">
-
-            {/* Description Section - High Priority */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 flex items-center gap-2">
-                  <FileText className="w-3 h-3" />
-                  Detailed Description
-                </h4>
-                <div className="h-px bg-border/40 flex-1 ml-4" />
-              </div>
-              <div className="bg-muted/20 rounded-[20px] p-5 border border-border/40 relative group">
-                <div className="text-[13px] text-foreground/90 leading-relaxed whitespace-pre-wrap font-medium">
-                  {(() => {
-                    const text = descriptionTarget?.description || "";
-                    const isLong = text.length > 500;
-
-                    if (!isLong || showFullDesc) {
-                      return (
-                        <>
-                          {text}
-                          {isLong && (
-                            <button
-                              onClick={() => setShowFullDesc(false)}
-                              className="ml-2 text-primary hover:underline font-black uppercase text-[10px] tracking-wider"
-                            >
-                              Show Less
-                            </button>
-                          )}
-                        </>
-                      );
-                    }
-
-                    return (
-                      <>
-                        {text.slice(0, 500)}...
-                        <button
-                          onClick={() => setShowFullDesc(true)}
-                          className="ml-2 text-primary hover:underline font-black uppercase text-[10px] tracking-wider"
-                        >
-                          Read More
-                        </button>
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
-            </div>
-
-            {/* Meta Information Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
-              {/* Left Column: Project Name Only */}
-              <div className="space-y-5">
-                <div className="space-y-2.5">
-                  <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Execution Context</h4>
-                  <div className="grid grid-cols-1 gap-2.5">
-                    <div className="flex items-center gap-3.5 bg-secondary/30 p-3.5 rounded-2xl border border-border/40">
-                      <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                        <Bug className="w-4.5 h-4.5 text-primary" />
-                      </div>
-                      <div>
-                        <span className="text-[9px] font-bold text-muted-foreground/60 block uppercase tracking-wider">Project Name</span>
-                        <span className="text-[12px] font-black text-foreground">
-                          {descriptionTarget?.projectId ? projects.find(p => p.id === descriptionTarget.projectId)?.name : "General Workspace"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column: Assignees */}
-              <div className="space-y-3.5">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Responsible Team</h4>
-                  <Badge variant="secondary" className="text-[8px] font-black rounded-full h-4.5">
-                    {descriptionTarget?.assignees?.length || 0} Members
-                  </Badge>
-                </div>
-                <div className="grid grid-cols-1 gap-2 max-h-[180px] overflow-y-auto pr-2 premium-scrollbar-small">
-                  {descriptionTarget?.assignees && descriptionTarget.assignees.length > 0 ? (
-                    descriptionTarget.assignees.map((a, idx) => (
-                      <div key={idx} className="flex items-center gap-2.5 bg-background border border-border/80 p-2 rounded-2xl group hover:border-primary/40 transition-all">
-                        <div className="w-8 h-8 rounded-xl bg-primary/5 flex items-center justify-center text-[10px] font-black text-primary border border-primary/5 group-hover:bg-primary group-hover:text-white transition-all duration-300">
-                          {a.username.slice(0, 2).toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <span className="text-[12px] font-bold text-foreground block truncate">{a.username}</span>
-                          <span className="text-[9px] text-muted-foreground/60 font-medium block uppercase tracking-tighter">Contributor</span>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="h-20 flex flex-col items-center justify-center border border-dashed border-border rounded-2xl text-muted-foreground/40 italic">
-                      <Users className="w-5 h-5 mb-1.5 opacity-20" />
-                      <span className="text-[11px]">No team assigned</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Remarks Section */}
-            {descriptionTarget?.remarks && (
-              <div className="pt-2">
-                <div className="bg-primary/[0.03] rounded-3xl p-5 border border-primary/10 relative overflow-hidden">
-                  <div className="absolute -right-4 -bottom-4 opacity-[0.03] text-primary">
-                    <MessageSquare className="w-20 h-20" />
-                  </div>
-                  <div className="flex items-center gap-2 mb-2 relative z-10">
-                    <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <MessageSquare className="w-3.5 h-3.5 text-primary" />
-                    </div>
-                    <span className="text-[9px] font-black uppercase tracking-widest text-primary">Internal Resolution Note</span>
-                  </div>
-                  <p className="text-[12px] text-foreground/80 leading-relaxed italic font-medium relative z-10 pl-2 border-l-2 border-primary/20">
-                    "{descriptionTarget.remarks}"
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </AppLayout>
+    </AppLayout >
   );
 };
 

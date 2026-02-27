@@ -37,10 +37,6 @@ const Ticket = sequelize.define('Ticket', {
         type: DataTypes.INTEGER,
         allowNull: true, // null = General/Global ticket
     },
-    remarks: {
-        type: DataTypes.TEXT,
-        allowNull: true
-    },
     startDate: {
         type: DataTypes.DATE,
         allowNull: true

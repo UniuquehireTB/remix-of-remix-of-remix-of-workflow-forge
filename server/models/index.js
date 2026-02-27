@@ -6,6 +6,7 @@ const TicketAssignee = require('./TicketAssignee');
 const Note = require('./Note');
 const NoteShare = require('./NoteShare');
 const Notification = require('./Notification');
+const Comment = require('./Comment');
 
 // Project <-> User (Members)
 Project.belongsToMany(User, { through: ProjectMember, as: 'members', foreignKey: 'projectId' });
@@ -48,6 +49,14 @@ User.hasMany(Notification, { foreignKey: 'userId', as: 'notifications' });
 Notification.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 Notification.belongsTo(User, { foreignKey: 'senderId', as: 'sender' });
 
+// Ticket <-> Comment
+Ticket.hasMany(Comment, { foreignKey: 'ticketId', as: 'comments' });
+Comment.belongsTo(Ticket, { foreignKey: 'ticketId', as: 'ticket' });
+
+// User <-> Comment
+User.hasMany(Comment, { foreignKey: 'userId', as: 'comments' });
+Comment.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
 module.exports = {
     User,
     Project,
@@ -56,5 +65,6 @@ module.exports = {
     TicketAssignee,
     Note,
     NoteShare,
-    Notification
+    Notification,
+    Comment
 };

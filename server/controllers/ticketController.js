@@ -60,6 +60,15 @@ const getAllTickets = async (req, res) => {
             ];
         }
 
+        if (assigneeId && assigneeId !== 'All') {
+            const ticketAssignees = await TicketAssignee.findAll({
+                where: { userId: assigneeId },
+                attributes: ['ticketId']
+            });
+            const ticketIds = ticketAssignees.map(ta => ta.ticketId);
+            whereClause.id = { [Op.in]: ticketIds };
+        }
+
         const { count, rows } = await Ticket.findAndCountAll({
             where: whereClause,
             limit: limit,
@@ -71,8 +80,7 @@ const getAllTickets = async (req, res) => {
                     model: User,
                     as: 'assignees',
                     attributes: ['id', 'username', 'role'],
-                    through: { attributes: ['joinDate'] },
-                    ...(assigneeId && assigneeId !== 'All' && { where: { id: assigneeId } })
+                    through: { attributes: ['joinDate'] }
                 }
             ],
             order: [['createdAt', 'DESC']]
@@ -218,43 +226,11 @@ const updateTicketStatus = async (req, res) => {
     }
 };
 
-const updateTicketRemarks = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { remarks } = req.body;
-
-        const ticket = await Ticket.findByPk(id);
-        if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
-
-        await ticket.update({ remarks, modifiedBy: req.user.id });
-
-        // Notify Assignees + Creator
-        const ticketIdNum = ticket.id;
-        const assigneesList = await TicketAssignee.findAll({ where: { ticketId: ticketIdNum } });
-        const notifySet = new Set(assigneesList.map(a => a.userId));
-        notifySet.add(ticket.createdBy);
-
-        for (const userId of notifySet) {
-            await createNotification({
-                userId,
-                senderId: req.user.id,
-                title: 'New Remark Added',
-                message: `A new remark was added to ticket ${ticket.ticketId}`,
-                type: 'ticket',
-                targetId: ticketIdNum
-            });
-        }
-
-        res.json({ message: 'Remarks updated', ticket });
-    } catch (error) {
-        res.status(500).json({ message: 'Server error' });
-    }
-};
 
 const updateTicket = async (req, res) => {
     try {
         const { id } = req.params;
-        const { title, description, type, priority, projectId, assignees, startDate, endDate, status, closedAt, remarks } = req.body;
+        const { title, description, type, priority, projectId, assignees, startDate, endDate, status, closedAt } = req.body;
 
         // Validation
         if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
@@ -279,7 +255,7 @@ const updateTicket = async (req, res) => {
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 
         await ticket.update({
-            title, description, type, priority, projectId, startDate, endDate, status, closedAt, remarks,
+            title, description, type, priority, projectId, startDate, endDate, status, closedAt,
             modifiedBy: req.user.id
         });
 
@@ -344,11 +320,27 @@ const deleteTicket = async (req, res) => {
     }
 };
 
+const getTicketById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const ticket = await Ticket.findByPk(id, {
+            include: [
+                { model: Project, as: 'project', attributes: ['id', 'name'] },
+                { model: User, as: 'assignees', attributes: ['id', 'username', 'role'], through: { attributes: ['joinDate'] } }
+            ]
+        });
+        if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+        res.json(ticket);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
 module.exports = {
     getAllTickets,
+    getTicketById,
     createTicket,
     updateTicketStatus,
-    updateTicketRemarks,
     updateTicket,
     deleteTicket
 };

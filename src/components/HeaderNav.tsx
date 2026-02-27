@@ -124,7 +124,8 @@ export function HeaderNav() {
     const route = getNotificationRoute(n.type);
     if (route) {
       setNotifOpen(false);
-      navigate(route);
+      const url = n.targetId ? `${route}?ticketId=${n.targetId}` : route;
+      navigate(url);
     }
   };
 

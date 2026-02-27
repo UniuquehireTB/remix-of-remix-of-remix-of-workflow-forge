@@ -160,7 +160,7 @@ export function AnimatedDatePicker({
                 triggerClassName
               )}
             >
-              {showIcon && <CalendarIcon className="w-4 h-4 shrink-0" />}
+              {showIcon && <CalendarIcon className="w-3.5 h-3.5 shrink-0 text-muted-foreground/40" />}
               {(selected || placeholder) && (
                 <span className={cn("truncate", !selected && "text-muted-foreground/50")}>
                   {selected ? format(selected, "MMM dd, yyyy") : placeholder}
@@ -170,20 +170,7 @@ export function AnimatedDatePicker({
           )}
         </DialogPrimitive.Trigger>
 
-        {!children && selected && !disabled && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onChange("");
-              setOpen(false);
-            }}
-            title="Clear date"
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-md flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors z-10"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        )}
+
       </div>
 
       <DialogPrimitive.Portal>
