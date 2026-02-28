@@ -68,7 +68,7 @@ const getAllNotes = async (req, res) => {
             ],
             order: [
                 ['pinned', 'DESC'],
-                ['createdAt', 'DESC']
+                ['updatedAt', 'DESC']
             ],
             distinct: true
         });
@@ -111,7 +111,19 @@ const createNote = async (req, res) => {
             modifiedBy: req.user.id
         });
 
-        res.status(201).json(note);
+        const createdNote = await Note.findByPk(note.id, {
+            include: [
+                { model: Project, as: 'project', attributes: ['id', 'name'] },
+                { model: User, as: 'user', attributes: ['id', 'username', 'role'] },
+                {
+                    model: NoteShare,
+                    as: 'shares',
+                    attributes: ['id', 'noteId', 'sharedWithUserId', 'canEdit'],
+                    include: [{ model: User, as: 'sharedWithUser', attributes: ['id', 'username'] }]
+                }
+            ]
+        });
+        res.status(201).json(createdNote);
     } catch (error) {
         console.error('Error creating note:', error);
         res.status(500).json({ message: 'Server error' });
@@ -149,19 +161,35 @@ const updateNote = async (req, res) => {
             modifiedBy: req.user.id
         });
 
-        // If updated by someone else, notify the owner
-        if (note.userId !== req.user.id) {
+        // Notify all interested parties
+        const shares = await NoteShare.findAll({ where: { noteId: id } });
+        const usersToNotify = [note.userId, ...shares.map(s => s.sharedWithUserId)]
+            .filter(uid => uid !== req.user.id);
+
+        for (const uid of [...new Set(usersToNotify)]) {
             await createNotification({
-                userId: note.userId,
+                userId: uid,
                 senderId: req.user.id,
-                title: 'Shared Note Updated',
-                message: `${req.user.username} updated your shared note: ${title}`,
+                title: 'Note Updated',
+                message: `${req.user.username} updated the note: ${title}`,
                 type: 'note',
                 targetId: note.id
             });
         }
 
-        res.json(note);
+        const updatedNote = await Note.findByPk(id, {
+            include: [
+                { model: Project, as: 'project', attributes: ['id', 'name'] },
+                { model: User, as: 'user', attributes: ['id', 'username', 'role'] },
+                {
+                    model: NoteShare,
+                    as: 'shares',
+                    attributes: ['id', 'noteId', 'sharedWithUserId', 'canEdit'],
+                    include: [{ model: User, as: 'sharedWithUser', attributes: ['id', 'username'] }]
+                }
+            ]
+        });
+        res.json(updatedNote);
     } catch (error) {
         console.error('Error updating note:', error);
         res.status(500).json({ message: 'Server error' });

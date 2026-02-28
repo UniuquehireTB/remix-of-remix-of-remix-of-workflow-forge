@@ -11,6 +11,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, formatDistanceToNow } from "date-fns";
 
+import { ticketService } from "@/services/authService";
+
 interface ProjectDetailViewProps {
     project: any;
     onClose: () => void;
@@ -25,10 +27,27 @@ export function ProjectDetailView({
     onDelete
 }: ProjectDetailViewProps) {
     const [isExpanded, setIsExpanded] = React.useState(false);
+    const [stats, setStats] = React.useState<any>({
+        'Open': 0,
+        'In Progress': 0,
+        'On Hold': 0,
+        'Closed': 0,
+        'total': 0
+    });
+
+    React.useEffect(() => {
+        if (project?.id) {
+            ticketService.getStats(project.id)
+                .then((data: any) => setStats(data))
+                .catch(err => console.error("Error fetching project ticket stats:", err));
+        }
+    }, [project?.id]);
 
     if (!project) return null;
 
     const createdDate = project.createdAt ? formatDistanceToNow(new Date(project.createdAt)) + " ago" : "—";
+
+    const formatCount = (count: number) => count.toString().padStart(2, '0');
 
     return (
         <motion.div
@@ -36,9 +55,8 @@ export function ProjectDetailView({
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed inset-y-0 right-0 w-[500px] bg-background border-l border-border shadow-2xl z-50 flex flex-col overflow-hidden"
+            className="fixed inset-y-0 right-0 w-[500px] bg-background border-l border-border shadow-2xl z-[110] flex flex-col overflow-hidden"
         >
-            {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-border/50">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground shrink-0 shadow-lg shadow-primary/20">
@@ -60,7 +78,7 @@ export function ProjectDetailView({
                                     <Pencil className="w-4 h-4" />
                                 </Button>
                             </TooltipTrigger>
-                            <TooltipContent side="bottom" className="font-bold text-[10px] uppercase">Edit Project</TooltipContent>
+                            <TooltipContent side="bottom" className="font-bold text-[10px] capitalize">Edit Project</TooltipContent>
                         </Tooltip>
 
                         <Tooltip>
@@ -69,7 +87,7 @@ export function ProjectDetailView({
                                     <Trash2 className="w-4 h-4" />
                                 </Button>
                             </TooltipTrigger>
-                            <TooltipContent side="bottom" className="font-bold text-[10px] uppercase">Delete Project</TooltipContent>
+                            <TooltipContent side="bottom" className="font-bold text-[10px] capitalize">Delete Project</TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
 
@@ -119,9 +137,10 @@ export function ProjectDetailView({
                         </div>
 
                         <div className="p-2 px-3.5 space-y-0.5 flex flex-col justify-center bg-muted/10">
-                            <label className="text-[10px] font-bold text-muted-foreground/60 tracking-tight">Created</label>
+                            <label className="text-[10px] font-bold text-muted-foreground/60 tracking-tight">ID & Created</label>
                             <div className="text-[11px] font-semibold text-foreground/70 truncate flex items-center gap-1.5">
-                                <Calendar className="w-3.5 h-3.5 text-muted-foreground/60" />
+                                <span className="bg-primary/10 text-primary px-1 rounded-sm text-[9px] font-black">{project.projectCode}</span>
+                                <span className="text-muted-foreground/40 text-[10px]">•</span>
                                 {createdDate}
                             </div>
                         </div>
@@ -186,23 +205,23 @@ export function ProjectDetailView({
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 flex items-center gap-3 transition-all hover:border-slate-300 group">
+                            <div className="w-8 h-8 rounded-lg bg-slate-500/10 flex items-center justify-center text-slate-600 border border-slate-500/10 group-hover:bg-slate-500 group-hover:text-white transition-all">
+                                <FileText className="w-4 h-4" />
+                            </div>
+                            <div>
+                                <p className="text-[11px] font-bold text-muted-foreground capitalize leading-none mb-1">Open</p>
+                                <p className="text-base font-bold text-foreground tracking-tight">{stats['Open'] || 0}</p>
+                            </div>
+                        </div>
+
                         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 flex items-center gap-3 transition-all hover:border-primary/20 group">
                             <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600 border border-blue-500/10 group-hover:bg-blue-500 group-hover:text-white transition-all">
                                 <Activity className="w-4 h-4" />
                             </div>
                             <div>
                                 <p className="text-[11px] font-bold text-muted-foreground capitalize leading-none mb-1">In Progress</p>
-                                <p className="text-base font-bold text-foreground tracking-tight">04</p>
-                            </div>
-                        </div>
-
-                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 flex items-center gap-3 transition-all hover:border-emerald-500/20 group">
-                            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 border border-emerald-500/10 group-hover:bg-emerald-500 group-hover:text-white transition-all">
-                                <CheckCircle2 className="w-4 h-4" />
-                            </div>
-                            <div>
-                                <p className="text-[11px] font-bold text-muted-foreground capitalize leading-none mb-1">Completed</p>
-                                <p className="text-base font-bold text-foreground tracking-tight">12</p>
+                                <p className="text-base font-bold text-foreground tracking-tight">{stats['In Progress'] || 0}</p>
                             </div>
                         </div>
 
@@ -212,17 +231,17 @@ export function ProjectDetailView({
                             </div>
                             <div>
                                 <p className="text-[11px] font-bold text-muted-foreground capitalize leading-none mb-1">On Hold</p>
-                                <p className="text-base font-bold text-foreground tracking-tight">02</p>
+                                <p className="text-base font-bold text-foreground tracking-tight">{stats['On Hold'] || 0}</p>
                             </div>
                         </div>
 
-                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 flex items-center gap-3 transition-all hover:border-slate-400 group">
-                            <div className="w-8 h-8 rounded-lg bg-slate-500/10 flex items-center justify-center text-slate-600 border border-slate-500/10 group-hover:bg-slate-500 group-hover:text-white transition-all">
-                                <FileText className="w-4 h-4" />
+                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 flex items-center gap-3 transition-all hover:border-emerald-500/20 group">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 border border-emerald-500/10 group-hover:bg-emerald-500 group-hover:text-white transition-all">
+                                <CheckCircle2 className="w-4 h-4" />
                             </div>
                             <div>
-                                <p className="text-[11px] font-bold text-muted-foreground capitalize leading-none mb-1">Total Rise</p>
-                                <p className="text-base font-bold text-foreground tracking-tight">18</p>
+                                <p className="text-[11px] font-bold text-muted-foreground capitalize leading-none mb-1">Closed</p>
+                                <p className="text-base font-bold text-foreground tracking-tight">{stats['Closed'] || 0}</p>
                             </div>
                         </div>
                     </div>

@@ -49,6 +49,11 @@ const Ticket = sequelize.define('Ticket', {
         type: DataTypes.DATE,
         allowNull: true
     },
+    dueHistory: {
+        type: DataTypes.JSON, // Array of { from, to, reason, userId, timestamp }
+        allowNull: true,
+        defaultValue: []
+    },
     ...baseEntityAttributes,
 }, {
     tableName: 'Tickets'

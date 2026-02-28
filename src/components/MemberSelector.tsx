@@ -91,9 +91,11 @@ export function MemberSelector({
     };
 
     const toggleMember = (id: number) => {
-        if (allowedMemberIds && !allowedMemberIds.includes(id)) return;
+        const alreadySelected = isMemberSelected(id);
+        // Only block ADDING if not in allowedMemberIds — never block REMOVING
+        if (!alreadySelected && allowedMemberIds && !allowedMemberIds.some(aid => String(aid) === String(id))) return;
 
-        if (isMemberSelected(id)) {
+        if (alreadySelected) {
             onChange(selected.filter(s => {
                 const sid = typeof s === 'object' ? s.id : s;
                 return String(sid) !== String(id);
@@ -115,6 +117,7 @@ export function MemberSelector({
     };
 
     const hasAllTeamSelected = members.length > 1 && members.filter(m => String(m.id) !== String(currentUser?.id)).every(m => isMemberSelected(m.id));
+    const hasAnyTeamSelected = members.some(m => String(m.id) !== String(currentUser?.id) && isMemberSelected(m.id));
 
     const toggleAllTeam = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -141,6 +144,8 @@ export function MemberSelector({
 
     const filteredMembers = members.filter(m =>
         String(m.id) !== String(currentUser?.id) &&
+        // If allowedMemberIds is set (e.g. ticket has a project), only show project members
+        (!allowedMemberIds || allowedMemberIds.some(aid => String(aid) === String(m.id))) &&
         (m.username.toLowerCase().includes(search.toLowerCase()) || m.role.toLowerCase().includes(search.toLowerCase()))
     );
 
@@ -184,14 +189,14 @@ export function MemberSelector({
                             onClick={toggleAllTeam}
                             className={cn(
                                 "h-7 px-3 rounded-full border-2 transition-all font-bold text-[9px] flex items-center gap-1.5 uppercase tracking-tighter",
-                                hasAllTeamSelected
+                                hasAnyTeamSelected
                                     ? "bg-success/10 border-success/30 text-success"
                                     : "bg-background border-border text-muted-foreground hover:border-primary/30"
                             )}
                         >
                             <Shield className="w-3 h-3" />
                             Team
-                            {hasAllTeamSelected && <CheckCircle2 className="w-3 h-3 text-success fill-success/10" />}
+                            {hasAnyTeamSelected && <CheckCircle2 className="w-3 h-3 text-success fill-success/10" />}
                         </button>
                     )}
                 </div>
@@ -357,7 +362,7 @@ export function MemberSelector({
                 </PopoverAnchor>
 
                 <PopoverContent
-                    className="p-0 border-none bg-transparent shadow-none z-[100]"
+                    className="p-0 border-none bg-transparent shadow-none z-[200]"
                     side="bottom"
                     align="start"
                     sideOffset={6}
@@ -384,26 +389,34 @@ export function MemberSelector({
                         </div>
                         <div className="max-h-[260px] overflow-y-auto p-2 space-y-1 scrollbar-hide">
                             {filteredMembers.length === 0 ? (
-                                <div className="p-4 text-center">
+                                <div className="p-4 text-center space-y-1">
                                     <p className="text-xs text-muted-foreground font-medium">No members found matching your search</p>
+                                    {allowedMemberIds && search.length > 0 && (
+                                        <p className="text-[10px] text-amber-500/80 font-semibold">
+                                            💡 Please add this member to the project first
+                                        </p>
+                                    )}
+                                    {allowedMemberIds && search.length === 0 && filteredMembers.length === 0 && (
+                                        <p className="text-[10px] text-muted-foreground/60 font-semibold">
+                                            No members have been added to this project yet
+                                        </p>
+                                    )}
                                 </div>
                             ) : (
                                 filteredMembers.map(m => {
                                     const active = isMemberSelected(m.id);
-                                    const isAllowed = !allowedMemberIds || allowedMemberIds.includes(m.id);
 
                                     return (
                                         <div
                                             key={m.id}
                                             className={cn(
                                                 "flex items-center justify-between p-2 rounded-xl border-2 transition-all",
-                                                active ? "bg-primary/5 border-primary/20" : "border-transparent hover:bg-muted/50",
-                                                !isAllowed && "opacity-40 grayscale cursor-not-allowed"
+                                                active ? "bg-primary/5 border-primary/20" : "border-transparent hover:bg-muted/50"
                                             )}
                                         >
                                             <div
                                                 className="flex items-center gap-2.5 flex-1 cursor-pointer"
-                                                onClick={() => isAllowed && toggleMember(m.id)}
+                                                onClick={() => toggleMember(m.id)}
                                             >
                                                 <div className={cn(
                                                     "w-7 h-7 rounded-lg flex items-center justify-center text-[9px] font-black shrink-0",

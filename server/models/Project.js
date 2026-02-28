@@ -20,6 +20,11 @@ const Project = sequelize.define('Project', {
         type: DataTypes.TEXT,
         allowNull: true,
     },
+    projectCode: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        unique: true,
+    },
     ...baseEntityAttributes,
 }, {
     tableName: 'Projects'

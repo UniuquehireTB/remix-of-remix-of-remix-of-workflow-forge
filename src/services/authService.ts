@@ -70,6 +70,14 @@ export const authService = {
         return apiService.get('/user/members-list');
     },
 
+    getAllUsers: async () => {
+        return apiService.get('/user/all');
+    },
+
+    updateUser: async (id: number, data: { username: string; email: string; role: string }) => {
+        return apiService.put(`/user/${id}`, data);
+    },
+
     refresh: async () => {
         const data = await apiService.post('/auth/refresh', {});
         if (data.token) {
@@ -118,6 +126,12 @@ export const ticketService = {
     },
     delete: async (id: number) => {
         return apiService.delete(`/tickets/${id}`);
+    },
+    getStats: async (projectId: any) => {
+        return apiService.get(`/tickets/stats?projectId=${projectId}`);
+    },
+    extendDueDate: async (id: number, data: { endDate: string, reason: string }) => {
+        return apiService.put(`/tickets/${id}/extend-due-date`, data);
     }
 };
 

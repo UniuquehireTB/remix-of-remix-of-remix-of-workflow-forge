@@ -1,6 +1,7 @@
 const { Ticket, User, Project, TicketAssignee, ProjectMember } = require('../models');
 const { createNotification } = require('./notificationController');
 const { Op } = require('sequelize');
+const { sequelize } = require('../db');
 
 const getAllTickets = async (req, res) => {
     try {
@@ -251,11 +252,29 @@ const updateTicket = async (req, res) => {
             }
         }
 
-        const ticket = await Ticket.findByPk(id);
+        const ticket = await Ticket.findByPk(id, {
+            include: [{ model: User, as: 'assignees' }]
+        });
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+        const { extendReason } = req.body;
+        let updatedHistory = ticket.dueHistory || [];
+
+        // If endDate is changed and it's an extension, and a reason is provided
+        if (endDate && ticket.endDate && new Date(endDate) > new Date(ticket.endDate) && extendReason) {
+            updatedHistory = [...updatedHistory, {
+                from: ticket.endDate,
+                to: endDate,
+                reason: extendReason,
+                username: req.user.username,
+                userId: req.user.id,
+                timestamp: new Date()
+            }];
+        }
 
         await ticket.update({
             title, description, type, priority, projectId, startDate, endDate, status, closedAt,
+            dueHistory: updatedHistory,
             modifiedBy: req.user.id
         });
 
@@ -286,7 +305,7 @@ const updateTicket = async (req, res) => {
                     userId,
                     senderId: req.user.id,
                     title: 'Ticket Updated',
-                    message: `Ticket ${ticket.ticketId} details were updated by ${req.user.username}`,
+                    message: `Ticket ${ticket.ticketId} updated by ${req.user.username}.${endDate !== ticket.endDate ? ' Due date changed.' : ''}`,
                     type: 'ticket',
                     targetId: ticketIdVal
                 });
@@ -336,11 +355,111 @@ const getTicketById = async (req, res) => {
     }
 };
 
+const getTicketStatsByProject = async (req, res) => {
+    try {
+        const { projectId } = req.query;
+        if (!projectId) return res.status(400).json({ message: 'Project ID is required' });
+
+        const whereClause = {
+            isActive: true,
+            ...(projectId && projectId !== 'All' && {
+                projectId: projectId === 'null' ? null : projectId
+            })
+        };
+
+        const stats = await Ticket.findAll({
+            where: whereClause,
+            attributes: [
+                'status',
+                [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+            ],
+            group: ['status']
+        });
+
+        const counts = {
+            'Open': 0,
+            'In Progress': 0,
+            'On Hold': 0,
+            'Closed': 0,
+            'total': 0
+        };
+
+        stats.forEach(s => {
+            const count = parseInt(s.dataValues.count);
+            counts.total += count;
+            if (counts.hasOwnProperty(s.status)) {
+                counts[s.status] = count;
+            }
+        });
+
+        res.json(counts);
+    } catch (error) {
+        console.error('Error fetching ticket stats:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+const extendTicketDueDate = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { endDate, reason } = req.body;
+
+        const ticket = await Ticket.findByPk(id, {
+            include: [
+                { model: Project, as: 'project', attributes: ['id', 'name'] },
+                { model: User, as: 'assignees', attributes: ['id', 'username', 'role'], through: { attributes: ['joinDate'] } }
+            ]
+        });
+        if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+        const history = ticket.dueHistory || [];
+        const newHistoryItem = {
+            from: ticket.endDate,
+            to: endDate,
+            reason: reason || 'Date extended',
+            username: req.user.username,
+            userId: req.user.id,
+            timestamp: new Date()
+        };
+
+        const updatedHistory = [...history, newHistoryItem];
+
+        await ticket.update({
+            endDate,
+            dueHistory: updatedHistory,
+            modifiedBy: req.user.id
+        });
+
+        // Notify Assignees + Creator
+        const notifyIds = new Set(ticket.assignees.map(a => a.id));
+        notifyIds.add(ticket.createdBy);
+
+        for (const userId of notifyIds) {
+            if (userId === req.user.id) continue;
+            await createNotification({
+                userId,
+                senderId: req.user.id,
+                title: 'Ticket Due Date Extended',
+                message: `Ticket ${ticket.ticketId} due date extended to ${endDate} by ${req.user.username}`,
+                type: 'ticket',
+                targetId: id
+            });
+        }
+
+        res.json({ message: 'Due date extended', ticket });
+    } catch (error) {
+        console.error('Error extending due date:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
 module.exports = {
     getAllTickets,
     getTicketById,
     createTicket,
     updateTicketStatus,
     updateTicket,
-    deleteTicket
+    deleteTicket,
+    getTicketStatsByProject,
+    extendTicketDueDate
 };

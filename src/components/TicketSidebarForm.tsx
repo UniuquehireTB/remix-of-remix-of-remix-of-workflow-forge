@@ -11,6 +11,13 @@ import { FormField } from "@/components/FormField";
 import { AnimatedDropdown } from "@/components/AnimatedDropdown";
 import { AnimatedDatePicker } from "@/components/AnimatedDatePicker";
 import { MemberSelector } from "@/components/MemberSelector";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from "@/components/ui/dialog";
 
 interface TicketSidebarFormProps {
     open: boolean;
@@ -39,6 +46,12 @@ export function TicketSidebarForm({
     setErrors,
     isEditing
 }: TicketSidebarFormProps) {
+    const [reasonPopupOpen, setReasonPopupOpen] = React.useState(false);
+    const initialEndDate = React.useMemo(() => editData.endDate, [open, editData.id]);
+
+    // We'll use a local reason state that handleSave will use if needed
+    const [pendingEndDate, setPendingEndDate] = React.useState<string | null>(null);
+
     const allTypes = ["Bug", "Feature", "Improvement", "Task"];
     const allPriorities = ["Low", "Medium", "High", "Critical"];
 
@@ -50,7 +63,7 @@ export function TicketSidebarForm({
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed inset-y-0 right-0 w-[500px] bg-background border-l border-border shadow-2xl z-[60] flex flex-col overflow-hidden"
+            className="fixed inset-y-0 right-0 w-[500px] bg-background border-l border-border shadow-2xl z-[120] flex flex-col overflow-hidden"
         >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-border/50">
@@ -87,7 +100,7 @@ export function TicketSidebarForm({
 
                     <FormField label="Project" icon={FileText} required>
                         <AnimatedDropdown
-                            options={[{ label: "General", value: "" }, ...projects.map(p => ({ label: p.name, value: p.id.toString() }))]}
+                            options={projects.map(p => ({ label: p.name, value: p.id.toString() }))}
                             value={editData.projectId?.toString() || ""}
                             onChange={v => {
                                 const newProjectId = v ? parseInt(v) : null;
@@ -172,15 +185,20 @@ export function TicketSidebarForm({
                                 triggerClassName="h-11 bg-muted/20 border-border/60 rounded-xl"
                             />
                         </FormField>
-                        <FormField label="End Date" icon={Calendar} error={errors.endDate}>
+                        <FormField label="Due Date" icon={Calendar} error={errors.endDate}>
                             <AnimatedDatePicker
                                 value={editData.endDate || ""}
                                 onChange={v => {
-                                    setEditData((d: any) => ({ ...d, endDate: v }));
+                                    if (isEditing && initialEndDate && v && new Date(v) > new Date(initialEndDate)) {
+                                        setPendingEndDate(v);
+                                        setReasonPopupOpen(true);
+                                    } else {
+                                        setEditData((d: any) => ({ ...d, endDate: v }));
+                                    }
                                 }}
                                 error={!!errors.endDate}
                                 disabled={!editData.startDate && !editData.assignees?.some((a: any) => typeof a === 'object' && a.joinDate)}
-                                placeholder={(!editData.startDate && !editData.assignees?.some((a: any) => typeof a === 'object' && a.joinDate)) ? "Pick Start Date first" : "Select end date"}
+                                placeholder={(!editData.startDate && !editData.assignees?.some((a: any) => typeof a === 'object' && a.joinDate)) ? "Pick Start Date first" : "Select due date"}
                                 showIcon={false}
                                 triggerClassName="h-11 bg-muted/20 border-border/60 rounded-xl"
                             />
@@ -228,6 +246,45 @@ export function TicketSidebarForm({
                     {isEditing ? "Update Ticket" : "Rise Ticket"}
                 </Button>
             </div>
+            <Dialog open={reasonPopupOpen} onOpenChange={setReasonPopupOpen}>
+                <DialogContent className="max-w-md rounded-[24px] z-[200]">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-black tracking-tight flex items-center gap-2">
+                            <AlertCircle className="w-5 h-5 text-primary" />
+                            Extension Reason
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="py-2 space-y-4">
+                        <p className="text-sm text-muted-foreground font-medium">
+                            You are extending the due date. Please provide a brief reason for tracking.
+                        </p>
+                        <textarea
+                            className="premium-input min-h-[100px] p-4 text-sm resize-none rounded-xl"
+                            placeholder="Why is it being extended?"
+                            autoFocus
+                            value={editData.extendReason || ""}
+                            onChange={e => setEditData((d: any) => ({ ...d, extendReason: e.target.value }))}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="ghost" className="rounded-xl font-bold" onClick={() => {
+                            setReasonPopupOpen(false);
+                            setPendingEndDate(null);
+                        }}>Cancel</Button>
+                        <Button
+                            className="rounded-xl bg-primary text-white font-black px-6"
+                            disabled={!editData.extendReason?.trim()}
+                            onClick={() => {
+                                setEditData((d: any) => ({ ...d, endDate: pendingEndDate }));
+                                setReasonPopupOpen(false);
+                                setPendingEndDate(null);
+                            }}
+                        >
+                            Confirm Extension
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </motion.div>
     );
 }

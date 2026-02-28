@@ -84,11 +84,11 @@ export function AnimatedDropdown({
           triggerClassName
         )}
       >
-        <span className={cn(!selected && "text-muted-foreground/50")}>
+        <span className={cn("flex-1 text-left min-w-0 truncate", !selected && "text-muted-foreground/50")}>
           {selected ? (
-            <span className="flex items-center gap-2">
+            <span className="flex items-center gap-2 truncate">
               {selected.icon}
-              {selected.label}
+              <span className="truncate">{selected.label}</span>
             </span>
           ) : (
             placeholder

@@ -73,10 +73,33 @@ const createProject = async (req, res) => {
     try {
         const { name, client, description, members } = req.body;
 
+        // Generate Project Code (Name[2] + Client[2] + 6 digits)
+        const namePart = (name || "").substring(0, 2).toUpperCase();
+        const clientPart = (client || "").substring(0, 2).toUpperCase();
+        const prefix = (namePart.padEnd(2, 'P') + clientPart.padEnd(2, 'C')); // P for Project, C for Client if names too short
+
+        const lastProject = await Project.findOne({
+            order: [['id', 'DESC']],
+            paranoid: false // Include soft-deleted projects for unique sequence
+        });
+
+        let nextNumber = 1;
+        if (lastProject && lastProject.projectCode) {
+            const lastCode = lastProject.projectCode;
+            // Extract numeric part (last 6 digits)
+            const lastNumericPart = lastCode.slice(-6);
+            if (!isNaN(parseInt(lastNumericPart))) {
+                nextNumber = parseInt(lastNumericPart) + 1;
+            }
+        }
+
+        const projectCode = `${prefix}${String(nextNumber).padStart(6, '0')}`;
+
         const project = await Project.create({
             name,
             client,
             description,
+            projectCode,
             createdBy: req.user.id,
             modifiedBy: req.user.id
         });
@@ -165,8 +188,31 @@ const updateProject = async (req, res) => {
     }
 };
 
+const deleteProject = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const project = await Project.findByPk(id);
+        if (!project) {
+            return res.status(404).json({ message: 'Project not found' });
+        }
+
+        // Soft delete: Set isActive to false
+        await project.update({
+            isActive: false,
+            modifiedBy: req.user.id
+        });
+
+        res.json({ message: 'Project deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting project:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
 module.exports = {
     getAllProjects,
     createProject,
-    updateProject
+    updateProject,
+    deleteProject
 };

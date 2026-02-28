@@ -1,17 +1,23 @@
 import { ReactNode } from "react";
 import { HeaderNav } from "@/components/HeaderNav";
+import { cn } from "@/lib/utils";
 
 interface AppLayoutProps {
   children: ReactNode;
   title: string;
   subtitle?: string;
+  hideNav?: boolean;
 }
 
-export function AppLayout({ children, title, subtitle }: AppLayoutProps) {
+export function AppLayout({ children, title, subtitle, hideNav = false, centerContent = false }: AppLayoutProps & { centerContent?: boolean }) {
   return (
-    <div className="min-h-screen flex flex-col w-full bg-background">
-      <HeaderNav />
-      <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 max-w-[1400px] w-full mx-auto">
+    <div className="h-screen flex flex-col w-full bg-background selection:bg-primary/10 overflow-hidden">
+      {!hideNav && <HeaderNav hideLinks={hideNav} />}
+      <main className={cn(
+        "flex-1 flex flex-col min-h-0",
+        !centerContent && "pt-16",
+        centerContent && "items-center justify-center p-0"
+      )}>
         {children}
       </main>
     </div>

@@ -6,13 +6,19 @@ const register = async (req, res) => {
     try {
         const { username, email, password, role } = req.body;
 
-        // Check if user already exists
-        const existingUser = await User.findOne({ where: { email } });
-        if (existingUser) {
-            return res.status(400).json({ message: 'User already exists' });
+        // Check if email already exists
+        const existingEmail = await User.findOne({ where: { email } });
+        if (existingEmail) {
+            return res.status(400).json({ message: 'User already exists with this email' });
         }
 
-        // Create user with tracking info
+        // Check if username already exists
+        const existingUsername = await User.findOne({ where: { username } });
+        if (existingUsername) {
+            return res.status(400).json({ message: 'Username is already taken' });
+        }
+
+        // Create user
         const user = await User.create({
             username,
             email,
@@ -22,16 +28,8 @@ const register = async (req, res) => {
             modifiedBy: req.user ? req.user.id : null
         });
 
-        // Generate JWT
-        const token = jwt.sign(
-            { id: user.id, username: user.username, role: user.role },
-            process.env.JWT_SECRET,
-            { expiresIn: '1h' }
-        );
-
         res.status(201).json({
-            message: 'User registered successfully',
-            token,
+            message: 'User created successfully',
             user: {
                 id: user.id,
                 username: user.username,
@@ -41,6 +39,11 @@ const register = async (req, res) => {
         });
     } catch (error) {
         console.error('Registration error:', error);
+        // Handle Sequelize unique constraint error
+        if (error.name === 'SequelizeUniqueConstraintError') {
+            const field = error.errors?.[0]?.path || 'field';
+            return res.status(400).json({ message: `User already exists with this ${field}` });
+        }
         res.status(500).json({ message: 'Server error during registration' });
     }
 };
