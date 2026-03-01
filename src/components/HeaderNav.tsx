@@ -331,7 +331,7 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
                 <div className="w-8 h-8 rounded-[3px] bg-[#0052CC] flex items-center justify-center shadow-sm">
                   <div className="w-4 h-4 border-2 border-white rounded-[1px]" />
                 </div>
-                <span className="font-bold text-lg text-[#172B4D] tracking-tight">TrackFlow</span>
+                <span className="font-bold text-lg text-[#172B4D] tracking-tight">Track Flow</span>
               </div>
               {!hideLinks && (
                 <nav className="hidden md:flex items-center h-full gap-2">

@@ -107,7 +107,7 @@ const Login = () => {
             transition={{ delay: 0.3, duration: 0.5 }}
           >
             <h1 className="text-[40px] font-extrabold text-white mb-3 tracking-tight leading-tight">
-              TrackFlow
+              Track Flow
             </h1>
             <p className="text-[17px] font-semibold text-white/85 mb-4">
               Smart Project &amp; Ticket Management
