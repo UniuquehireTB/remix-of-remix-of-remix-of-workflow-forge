@@ -19,35 +19,34 @@ interface CrudDialogProps {
   children: ReactNode;
   saveLabel?: string;
   size?: "sm" | "md" | "lg";
+  loading?: boolean;
 }
 
-export function CrudDialog({ open, onClose, title, subtitle, icon, onSave, children, saveLabel = "Save Changes", size = "md" }: CrudDialogProps) {
+export function CrudDialog({ open, onClose, title, subtitle, icon, onSave, children, saveLabel = "Save Changes", size = "md", loading = false }: CrudDialogProps) {
   const maxW = size === "lg" ? "max-w-2xl" : size === "sm" ? "max-w-sm" : "max-w-lg";
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className={`${maxW} rounded-2xl border-2 p-0 flex flex-col max-h-[85vh] [&>button:last-child]:top-7 [&>button:last-child]:right-6`}>
-        <DialogHeader className="px-6 py-5 border-b border-border shrink-0">
+      <DialogContent className={`${maxW} rounded-[3px] border border-border p-0 flex flex-col max-h-[85vh] shadow-2xl [&>button:last-child]:top-5 [&>button:last-child]:right-5`}>
+        <DialogHeader className="px-6 py-4 border-b border-border/60 shrink-0 bg-white">
           <div className="flex items-center gap-4">
             {icon && (
-              <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+              <div className="w-10 h-10 rounded-[3px] bg-[#DEEBFF] flex items-center justify-center text-[#0052CC] shrink-0 border border-[#B3D4FF]/30">
                 {icon}
               </div>
             )}
-            <div>
-              <DialogTitle className="text-xl font-bold capitalize leading-none mb-1.5">{title}</DialogTitle>
-              {subtitle && <p className="text-[13px] text-muted-foreground font-medium leading-tight">{subtitle}</p>}
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-[20px] font-bold text-[#172B4D] leading-[1.2] mb-1 tracking-tight break-all">{title}</DialogTitle>
+              {subtitle && <p className="text-[13px] text-[#6B778C] font-medium leading-[1.4] mt-1 break-all">{subtitle}</p>}
             </div>
           </div>
         </DialogHeader>
-        <div className="space-y-4 px-6 py-4 overflow-y-auto flex-1">{children}</div>
-        <DialogFooter className="px-6 py-4 border-t border-border gap-2 shrink-0 bg-muted/30">
-          <Button variant="ghost" onClick={onClose} className="rounded-xl px-5 h-9 text-xs">
-            <X className="w-3.5 h-3.5 mr-1.5" />
+        <div className="px-6 py-6 overflow-y-auto flex-1 bg-white">{children}</div>
+        <DialogFooter className="px-6 py-4 border-t border-border/60 gap-3 shrink-0 bg-[#FAFBFC]">
+          <Button variant="ghost" onClick={onClose} className="rounded-[3px] px-6 h-9 text-[13px] font-bold text-[#42526E] hover:bg-[#EBECF0]">
             Cancel
           </Button>
-          <Button onClick={onSave} className="rounded-xl px-5 h-9 text-xs shadow-lg shadow-primary/25">
-            <Check className="w-3.5 h-3.5 mr-1.5" />
-            {saveLabel}
+          <Button onClick={onSave} loading={loading} className="rounded-[3px] px-6 h-9 text-[13px] font-bold bg-[#0052CC] hover:bg-[#0747A6] text-white shadow-none max-w-[240px]">
+            <span className="truncate">{saveLabel}</span>
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -60,24 +59,35 @@ interface DeleteDialogProps {
   onClose: () => void;
   onConfirm: () => void;
   itemName: string;
+  loading?: boolean;
 }
 
-export function DeleteDialog({ open, onClose, onConfirm, itemName }: DeleteDialogProps) {
+export function DeleteDialog({ open, onClose, onConfirm, itemName, loading = false }: DeleteDialogProps) {
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-sm rounded-2xl border-2 border-destructive/20">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-lg capitalize">
-            <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-destructive" />
+      <DialogContent className="max-w-md rounded-[3px] border border-[#FFEBE6] bg-white shadow-2xl p-0 overflow-hidden">
+        <DialogHeader className="px-6 py-5 border-b border-[#FFEBE6] bg-white">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-[3px] bg-[#FFEBE6] flex items-center justify-center border border-[#FFBDAD]/30 shrink-0">
+              <AlertTriangle className="w-5 h-5 text-[#DE350B]" />
             </div>
-            Delete {itemName}?
-          </DialogTitle>
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-[18px] font-bold text-[#172B4D] leading-tight break-words">
+                Delete this item?
+              </DialogTitle>
+            </div>
+          </div>
         </DialogHeader>
-        <p className="text-sm text-muted-foreground">This action cannot be undone. This will permanently delete this item.</p>
-        <DialogFooter className="gap-2">
-          <Button variant="ghost" onClick={onClose} className="rounded-xl">Cancel</Button>
-          <Button variant="destructive" onClick={onConfirm} className="rounded-xl shadow-lg shadow-destructive/25">Delete</Button>
+        <div className="px-6 py-6">
+          <p className="text-[14px] text-[#42526E] leading-relaxed break-words">
+            This action is permanent and cannot be undone. Are you sure you want to delete <span className="font-bold text-[#172B4D] break-all">"{itemName}"</span>?
+          </p>
+        </div>
+        <DialogFooter className="px-6 py-4 border-t border-[#FFEBE6] gap-3 bg-[#FAFBFC]">
+          <Button variant="ghost" onClick={onClose} className="rounded-[3px] font-bold text-[#42526E] hover:bg-[#EBECF0] h-9 px-6 text-[13px]">Cancel</Button>
+          <Button variant="destructive" onClick={onConfirm} loading={loading} className="rounded-[3px] bg-[#DE350B] hover:bg-[#BF2600] text-white font-bold h-9 px-6 text-[13px] shadow-none">
+            Delete
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

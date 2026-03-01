@@ -32,6 +32,7 @@ interface MemberSelectorProps {
     showTeam?: boolean;
     startDate?: string;
     endDate?: string;
+    labelClassName?: string;
 }
 
 export function MemberSelector({
@@ -48,6 +49,7 @@ export function MemberSelector({
     showTeam = true,
     startDate,
     endDate,
+    labelClassName,
 }: MemberSelectorProps) {
     const [members, setMembers] = useState<Member[]>([]);
     const [loading, setLoading] = useState(true);
@@ -160,8 +162,8 @@ export function MemberSelector({
             {/* Top Row: Label and Quick Buttons */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    {Icon && <Icon className="w-3.5 h-3.5 text-primary" />}
-                    <span className="text-sm font-bold text-foreground tracking-tight">{label}</span>
+                    {Icon && <Icon className="w-3.5 h-3.5 text-[#6B778C]" />}
+                    <span className={cn("text-[12px] font-bold text-[#6B778C] tracking-tight", labelClassName)}>{label}</span>
                 </div>
                 <div className="flex items-center gap-2">
                     {/* Self Button */}
@@ -170,15 +172,15 @@ export function MemberSelector({
                             type="button"
                             onClick={(e) => { e.stopPropagation(); toggleMember(currentUser?.id); }}
                             className={cn(
-                                "h-7 px-3 rounded-full border-2 transition-all font-bold text-[9px] flex items-center gap-1.5 uppercase tracking-tighter",
+                                "h-7 px-3 rounded-[3px] border transition-all font-bold text-[10px] flex items-center gap-1.5",
                                 isSelfSelected
-                                    ? "bg-success/10 border-success/30 text-success"
-                                    : "bg-background border-border text-muted-foreground hover:border-primary/30"
+                                    ? "bg-[#E3FCEF] border-[#00875A]/20 text-[#006644]"
+                                    : "bg-white border-[#DFE1E6] text-[#42526E] hover:bg-[#F4F5F7]"
                             )}
                         >
                             <UserIcon className="w-3 h-3" />
                             Self
-                            {isSelfSelected && <CheckCircle2 className="w-3 h-3 text-success fill-success/10" />}
+                            {isSelfSelected && <CheckCircle2 className="w-3 h-3 text-[#00875A]" />}
                         </button>
                     )}
 
@@ -188,15 +190,15 @@ export function MemberSelector({
                             type="button"
                             onClick={toggleAllTeam}
                             className={cn(
-                                "h-7 px-3 rounded-full border-2 transition-all font-bold text-[9px] flex items-center gap-1.5 uppercase tracking-tighter",
+                                "h-7 px-3 rounded-[3px] border transition-all font-bold text-[10px] flex items-center gap-1.5",
                                 hasAnyTeamSelected
-                                    ? "bg-success/10 border-success/30 text-success"
-                                    : "bg-background border-border text-muted-foreground hover:border-primary/30"
+                                    ? "bg-[#E3FCEF] border-[#00875A]/20 text-[#006644]"
+                                    : "bg-white border-[#DFE1E6] text-[#42526E] hover:bg-[#F4F5F7]"
                             )}
                         >
                             <Shield className="w-3 h-3" />
                             Team
-                            {hasAnyTeamSelected && <CheckCircle2 className="w-3 h-3 text-success fill-success/10" />}
+                            {hasAnyTeamSelected && <CheckCircle2 className="w-3 h-3 text-[#00875A]" />}
                         </button>
                     )}
                 </div>
@@ -207,9 +209,9 @@ export function MemberSelector({
                 <PopoverAnchor asChild>
                     <div
                         className={cn(
-                            "min-h-[44px] py-1.5 rounded-xl border-2 bg-muted/10 transition-all flex flex-wrap items-center px-3 gap-2 group cursor-text",
-                            "hover:border-primary/30",
-                            showDropdown ? "border-primary shadow-sm" : (error ? "border-destructive" : "border-border")
+                            "min-h-[40px] py-1.5 rounded-[3px] border bg-white transition-all flex flex-wrap items-center px-3 gap-2 group cursor-text",
+                            "hover:bg-[#F4F5F7] hover:border-[#DFE1E6]",
+                            showDropdown ? "border-[#4C9AFF] bg-white ring-1 ring-[#4C9AFF]" : (error ? "border-[#DE350B]" : "border-[#DFE1E6]")
                         )}
                         onClick={() => {
                             setShowDropdown(true);
@@ -222,10 +224,7 @@ export function MemberSelector({
                                     const id = typeof s === 'object' ? s.id : s;
                                     const joinDate = typeof s === 'object' ? s.joinDate : "";
 
-                                    // Robust member lookup including current user fallback
                                     let m = members.find(member => String(member.id) === String(id));
-
-                                    // If not found in members list, check if it's the current user
                                     if (!m && currentUser && String(currentUser.id) === String(id)) {
                                         m = currentUser;
                                     }
@@ -243,88 +242,58 @@ export function MemberSelector({
                                     return (
                                         <motion.div
                                             key={id}
-                                            initial={{ opacity: 0, scale: 0.8 }}
+                                            initial={{ opacity: 0, scale: 0.95 }}
                                             animate={{ opacity: 1, scale: 1 }}
-                                            exit={{ opacity: 0, scale: 0.8 }}
+                                            exit={{ opacity: 0, scale: 0.95 }}
                                             className={cn(
-                                                "h-8 bg-background border rounded-xl pl-1 pr-1 flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-200 shadow-sm transition-colors group/badge",
-                                                isInvalid ? "border-destructive/50 bg-destructive/5" : "border-border hover:border-primary/30"
+                                                "h-7 bg-white border border-[#DFE1E6] rounded-[3px] px-1 py-0.5 flex items-center gap-1.5 shadow-sm group/badge",
+                                                isInvalid && "border-[#DE350B] bg-[#FFEBE6]"
                                             )}
                                             onClick={(e) => e.stopPropagation()}
                                         >
-                                            <div className="w-5 h-5 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-[9px] font-black shrink-0">
+                                            <div className="w-5 h-5 rounded-[2px] bg-[#0052CC] text-white flex items-center justify-center text-[10px] font-bold shrink-0">
                                                 {String(m.id) === String(currentUser?.id) ? "S" : getInitials(m.username)}
                                             </div>
-                                            <span className="text-[10px] font-bold text-foreground whitespace-nowrap">
-                                                {String(m.id) === String(currentUser?.id) ? "Self" : m.username}
+                                            <span className="text-[12px] font-bold text-[#172B4D] whitespace-nowrap">
+                                                {String(m.id) === String(currentUser?.id) ? "Sam" : m.username}
                                             </span>
 
-                                            {/* Date selection inside badge */}
                                             {isTickets && (
-                                                <div className="flex items-center gap-1.5 ml-1">
-                                                    <div className="h-4 w-px bg-border/60 mx-1" />
-                                                    {!joinDate ? (
-                                                        <AnimatedDatePicker
-                                                            value=""
-                                                            onChange={(v) => updateJoinDate(id, v)}
-                                                            className="w-auto"
-                                                            disabled={!startDate}
-                                                            minDate={startDate}
-                                                            triggerClassName="h-6 w-6 p-0 border-none bg-primary/5 hover:bg-primary/10 text-primary !rounded-lg flex items-center justify-center transition-colors"
-                                                            placeholder=""
-                                                        />
-                                                    ) : (
-                                                        <AnimatedDatePicker
-                                                            value={joinDate}
-                                                            onChange={(v) => updateJoinDate(id, v)}
-                                                            className="w-auto"
-                                                            disabled={!startDate && !endDate}
-                                                            minDate={startDate}
-                                                            maxDate={endDate}
-                                                            triggerClassName="flex shadow-none border-none p-0 bg-transparent h-auto"
-                                                        >
-                                                            <div className={cn(
-                                                                "flex items-center gap-1.5 px-2 py-0.5 rounded-lg border animate-in fade-in zoom-in-95 duration-200 cursor-pointer transition-colors",
-                                                                isInvalid
-                                                                    ? "bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20"
-                                                                    : "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
-                                                            )}>
-                                                                <span className="text-[9px] font-black uppercase tracking-tight">
-                                                                    START-
-                                                                    {(() => {
-                                                                        try {
-                                                                            const d = new Date(joinDate);
-                                                                            return isNaN(d.getTime()) ? "" : format(d, "MMM d");
-                                                                        } catch { return ""; }
-                                                                    })()}
+                                                <div className="flex items-center gap-1 h-full">
+                                                    <div className="h-4 w-px bg-[#DFE1E6] mx-0.5" />
+                                                    <AnimatedDatePicker
+                                                        value={joinDate}
+                                                        onChange={(v) => updateJoinDate(id, v)}
+                                                        className="w-auto"
+                                                        disabled={!startDate && !endDate}
+                                                        minDate={startDate}
+                                                        maxDate={endDate}
+                                                        triggerClassName={cn(
+                                                            "h-6 min-w-[24px] px-1 rounded-[3px] flex items-center justify-center gap-1.5 transition-colors",
+                                                            joinDate ? "bg-[#F4F5F7] text-[#42526E] border border-[#DFE1E6]" : "text-[#42526E] hover:bg-[#F4F5F7]"
+                                                        )}
+                                                        placeholder=""
+                                                        showIcon={true}
+                                                        icon={<div className="w-3.5 h-3.5 opacity-60"><ChevronDown className="w-full h-full" /></div>}
+                                                    >
+                                                        {joinDate && (
+                                                            <div className="flex items-center gap-1.5 pr-1">
+                                                                <span className="text-[10px] font-bold text-[#172B4D]">
+                                                                    {format(new Date(joinDate), "MMM d")}
                                                                 </span>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        updateJoinDate(id, "");
-                                                                    }}
-                                                                    className={cn(
-                                                                        "w-3.5 h-3.5 rounded-md flex items-center justify-center transition-colors",
-                                                                        isInvalid ? "hover:bg-destructive/30" : "hover:bg-primary/30"
-                                                                    )}
-                                                                >
-                                                                    <X className="w-2.5 h-2.5" />
-                                                                </button>
                                                             </div>
-                                                        </AnimatedDatePicker>
-                                                    )}
+                                                        )}
+                                                    </AnimatedDatePicker>
                                                 </div>
                                             )}
 
-                                            {/* Access toggle inside badge for notes */}
                                             {!isTickets && onEditToggle && (
-                                                <div className="flex items-center gap-1.5 ml-0.5">
-                                                    <div className="h-4 w-px bg-border/60 mx-1" />
+                                                <div className="flex items-center gap-1.5 h-full">
+                                                    <div className="h-4 w-px bg-[#DFE1E6] mx-0.5" />
                                                     <Switch
                                                         checked={!!canEditMap?.[id]}
                                                         onCheckedChange={(v) => onEditToggle(id, v)}
-                                                        className="scale-[0.6] data-[state=checked]:bg-success"
+                                                        className="scale-[0.55] data-[state=checked]:bg-[#00875A]"
                                                     />
                                                 </div>
                                             )}
@@ -335,7 +304,7 @@ export function MemberSelector({
                                                     e.stopPropagation();
                                                     toggleMember(id);
                                                 }}
-                                                className="w-5 h-5 rounded-lg flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors ml-0.5"
+                                                className="w-5 h-5 rounded-[2px] flex items-center justify-center hover:bg-[#F4F5F7] text-[#6B778C] transition-colors"
                                             >
                                                 <X className="w-3.5 h-3.5" />
                                             </button>
@@ -350,11 +319,11 @@ export function MemberSelector({
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 onFocus={() => setShowDropdown(true)}
-                                className="bg-transparent border-none outline-none text-sm font-medium flex-1 min-w-[120px] placeholder:text-muted-foreground/50 h-7"
+                                className="bg-transparent border-none outline-none text-[14px] font-medium flex-1 min-w-[120px] placeholder:text-[#6B778C]/50 h-7 text-[#172B4D]"
                             />
                         </div>
                         <PopoverTrigger asChild>
-                            <button className="text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0">
+                            <button className="text-[#6B778C]/70 hover:text-[#0052CC] transition-colors shrink-0 p-1">
                                 <ChevronDown className={cn("w-4 h-4 transition-transform", showDropdown && "rotate-180")} />
                             </button>
                         </PopoverTrigger>
@@ -362,45 +331,35 @@ export function MemberSelector({
                 </PopoverAnchor>
 
                 <PopoverContent
-                    className="p-0 border-none bg-transparent shadow-none z-[200]"
+                    className="p-0 border-none bg-transparent shadow-none z-[1000]"
                     side="bottom"
                     align="start"
-                    sideOffset={6}
+                    sideOffset={4}
                     onOpenAutoFocus={(e) => e.preventDefault()}
                     style={{ width: containerRef.current?.offsetWidth }}
                 >
                     <motion.div
-                        initial={{ opacity: 0, y: -8 }}
+                        initial={{ opacity: 0, y: -4 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
-                        className="bg-popover border border-border rounded-2xl shadow-2xl backdrop-blur-xl mx-1"
+                        exit={{ opacity: 0, y: -4 }}
+                        className="bg-white border border-[#DFE1E6] rounded-[3px] shadow-[0_8px_24px_rgba(23,43,77,0.12)] max-w-full"
                     >
-                        <div className="p-2 border-b border-border bg-muted/30 flex items-center justify-between">
-                            <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground ml-2">Available Members</span>
+                        <div className="px-4 py-2.5 border-b border-[#DFE1E6] bg-white flex items-center justify-between">
+                            <span className="text-[12px] font-bold text-[#6B778C] tracking-wide">Available members</span>
                             {selected.length > 1 && (
                                 <button
                                     type="button"
                                     onClick={() => onChange([])}
-                                    className="text-[9px] font-bold text-destructive hover:bg-destructive/10 px-2 py-1 rounded-lg"
+                                    className="text-[12px] font-bold text-[#0052CC] hover:underline px-1"
                                 >
-                                    Clear All
+                                    Clear all
                                 </button>
                             )}
                         </div>
-                        <div className="max-h-[260px] overflow-y-auto p-2 space-y-1 scrollbar-hide">
+                        <div className="max-h-[300px] overflow-y-auto premium-scrollbar p-1.5 space-y-0.5">
                             {filteredMembers.length === 0 ? (
-                                <div className="p-4 text-center space-y-1">
-                                    <p className="text-xs text-muted-foreground font-medium">No members found matching your search</p>
-                                    {allowedMemberIds && search.length > 0 && (
-                                        <p className="text-[10px] text-amber-500/80 font-semibold">
-                                            💡 Please add this member to the project first
-                                        </p>
-                                    )}
-                                    {allowedMemberIds && search.length === 0 && filteredMembers.length === 0 && (
-                                        <p className="text-[10px] text-muted-foreground/60 font-semibold">
-                                            No members have been added to this project yet
-                                        </p>
-                                    )}
+                                <div className="p-6 text-center">
+                                    <p className="text-[13px] text-[#6B778C] font-medium leading-relaxed">No members found matching your search</p>
                                 </div>
                             ) : (
                                 filteredMembers.map(m => {
@@ -409,97 +368,39 @@ export function MemberSelector({
                                     return (
                                         <div
                                             key={m.id}
+                                            onClick={() => toggleMember(m.id)}
                                             className={cn(
-                                                "flex items-center justify-between p-2 rounded-xl border-2 transition-all",
-                                                active ? "bg-primary/5 border-primary/20" : "border-transparent hover:bg-muted/50"
+                                                "flex items-center justify-between p-2 pl-3 pr-4 rounded-[3px] border border-transparent transition-all cursor-pointer group/item",
+                                                active ? "bg-[#F4F5F7]" : "hover:bg-[#FAFBFC] hover:border-[#4C9AFF]/20"
                                             )}
                                         >
-                                            <div
-                                                className="flex items-center gap-2.5 flex-1 cursor-pointer"
-                                                onClick={() => toggleMember(m.id)}
-                                            >
+                                            <div className="flex items-center gap-3 flex-1 min-w-0">
                                                 <div className={cn(
-                                                    "w-7 h-7 rounded-lg flex items-center justify-center text-[9px] font-black shrink-0",
-                                                    active ? "bg-primary text-white" : "bg-muted text-muted-foreground"
+                                                    "w-8 h-8 rounded-[3px] flex items-center justify-center text-[10px] font-bold shrink-0 transition-colors",
+                                                    active ? "bg-[#0052CC] text-white" : "bg-[#EBECF0] text-[#42526E]"
                                                 )}>
                                                     {getInitials(m.username)}
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <p className={cn("text-xs font-bold truncate tracking-tight", active ? "text-primary" : "text-foreground")}>{m.username}</p>
-                                                    <p className="text-[8px] text-muted-foreground font-semibold uppercase leading-none">{m.role}</p>
+                                                    <p className={cn("text-[13px] font-bold truncate tracking-tight", active ? "text-[#0052CC]" : "text-[#172B4D]")}>{m.username}</p>
+                                                    <p className="text-[12px] text-[#6B778C] font-medium">{m.role}</p>
                                                 </div>
                                             </div>
 
-                                            {/* Right side Detail Section */}
-                                            <div className="flex items-center gap-2">
-                                                {active && isTickets && (
-                                                    <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-2 duration-200">
-                                                        {!getJoinDate(m.id) ? (
-                                                            <AnimatedDatePicker
-                                                                value=""
-                                                                onChange={(v) => updateJoinDate(m.id, v)}
-                                                                className="w-auto"
-                                                                disabled={!startDate && !endDate}
-                                                                minDate={startDate}
-                                                                maxDate={endDate}
-                                                                triggerClassName="h-9 w-9 p-0 rounded-xl border-2 border-border/50 bg-background hover:border-primary/30 hover:bg-primary/5 flex items-center justify-center text-muted-foreground hover:text-primary transition-all shadow-sm"
-                                                                placeholder=""
-                                                            />
-                                                        ) : (
-                                                            <AnimatedDatePicker
-                                                                value={getJoinDate(m.id)}
-                                                                onChange={(v) => updateJoinDate(m.id, v)}
-                                                                className="w-auto"
-                                                                disabled={!startDate && !endDate}
-                                                                minDate={startDate}
-                                                                maxDate={endDate}
-                                                                triggerClassName="flex shadow-none border-none p-0 bg-transparent h-auto"
-                                                            >
-                                                                <div className="flex items-center gap-2 bg-primary/10 text-primary border-2 border-primary/20 px-3 py-1.5 rounded-xl shadow-sm animate-in zoom-in-95 duration-200 cursor-pointer hover:bg-primary/20 transition-all">
-                                                                    <div className="flex flex-col items-start -space-y-0.5">
-                                                                        <span className="text-[7px] font-black uppercase tracking-widest opacity-60 text-primary/70">START DATE</span>
-                                                                        <span className="text-[10px] font-black tracking-tight">
-                                                                            {(() => {
-                                                                                try {
-                                                                                    const d = new Date(getJoinDate(m.id));
-                                                                                    return isNaN(d.getTime()) ? "" : format(d, "MMM d, yyyy");
-                                                                                } catch { return ""; }
-                                                                            })()}
-                                                                        </span>
-                                                                    </div>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            updateJoinDate(m.id, "");
-                                                                        }}
-                                                                        className="w-5 h-5 rounded-lg flex items-center justify-center hover:bg-primary/20 transition-colors ml-1"
-                                                                    >
-                                                                        <X className="w-3 h-3" />
-                                                                    </button>
-                                                                </div>
-                                                            </AnimatedDatePicker>
+                                            <div className="flex items-center gap-3">
+                                                {active && (
+                                                    <div className="flex items-center gap-3 animate-in fade-in zoom-in-95 duration-200">
+                                                        {isTickets && getJoinDate(m.id) && (
+                                                            <div className="flex flex-col items-end opacity-60">
+                                                                <span className="text-[8px] font-bold text-[#6B778C]">Start</span>
+                                                                <span className="text-[10px] font-bold text-[#172B4D]">
+                                                                    {format(new Date(getJoinDate(m.id)), "MMM d")}
+                                                                </span>
+                                                            </div>
                                                         )}
-                                                        <div className="bg-success text-white p-1 rounded-full shadow-md shrink-0 ring-4 ring-success/10">
-                                                            <Check className="w-2.5 h-2.5 stroke-[4px]" />
+                                                        <div className="w-6 h-6 rounded-full bg-[#E3FCEF] flex items-center justify-center border border-[#00875A]/20">
+                                                            <Check className="w-3.5 h-3.5 text-[#00875A] stroke-[3px]" />
                                                         </div>
-                                                    </div>
-                                                )}
-                                                {active && !isTickets && onEditToggle && (
-                                                    <div className="flex items-center gap-3 animate-in fade-in slide-in-from-right-2 duration-200">
-                                                        <Switch
-                                                            checked={!!canEditMap?.[m.id]}
-                                                            onCheckedChange={(v) => onEditToggle(m.id, v)}
-                                                            className="scale-75"
-                                                        />
-                                                        <div className="bg-success text-white p-1 rounded-full shadow-sm shrink-0">
-                                                            <Check className="w-2.5 h-2.5 stroke-[4px]" />
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {active && !isTickets && !onEditToggle && (
-                                                    <div className="bg-success text-white p-1 rounded-full shadow-sm">
-                                                        <Check className="w-2.5 h-2.5 stroke-[4px]" />
                                                     </div>
                                                 )}
                                             </div>
@@ -517,7 +418,7 @@ export function MemberSelector({
                         initial={{ opacity: 0, y: -4 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -4 }}
-                        className="text-xs text-destructive/90 font-medium pl-0.5"
+                        className="text-[11px] text-[#DE350B] font-bold pl-0.5 mt-1"
                     >
                         {error}
                     </motion.p>
@@ -528,24 +429,24 @@ export function MemberSelector({
 }
 
 export function MemberBadges({ members, max = 3 }: { members: Member[], max?: number }) {
-    if (!members || members.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
+    if (!members || members.length === 0) return <span className="text-[12px] text-[#6B778C]">—</span>;
 
     const shown = members.slice(0, max);
     const extra = members.length - max;
 
     return (
-        <div className="flex items-center -space-x-1.5">
+        <div className="flex items-center -space-x-2">
             {shown.map(m => (
                 <div
                     key={m.id}
                     title={`${m.username} (${m.role})`}
-                    className="w-7 h-7 rounded-lg bg-primary/10 border-2 border-card flex items-center justify-center text-[9px] font-bold text-primary shadow-sm"
+                    className="w-7 h-7 rounded-[3px] bg-[#0052CC] border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm ring-offset-0"
                 >
                     {getInitials(m.username)}
                 </div>
             ))}
             {extra > 0 && (
-                <div className="w-7 h-7 rounded-lg bg-muted border-2 border-card flex items-center justify-center text-[9px] font-bold text-muted-foreground">
+                <div className="w-7 h-7 rounded-[3px] bg-[#F4F5F7] border-2 border-white flex items-center justify-center text-[10px] font-bold text-[#42526E]">
                     +{extra}
                 </div>
             )}

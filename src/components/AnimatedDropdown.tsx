@@ -76,18 +76,18 @@ export function AnimatedDropdown({
         disabled={disabled}
         onClick={handleOpen}
         className={cn(
-          "w-full flex items-center justify-between gap-2 border-2 rounded-xl bg-background text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer",
-          size === "sm" ? "px-3 py-2 text-xs" : "px-3.5 py-2.5",
-          error ? "!border-destructive focus:ring-destructive/20" : "border-input",
-          open && "ring-2 ring-primary/20 border-primary",
-          disabled && "opacity-50 cursor-not-allowed bg-muted",
+          "w-full flex items-center justify-between gap-2 border rounded-[3px] bg-white text-[14px] font-medium transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-[#4C9AFF] focus:border-[#4C9AFF] cursor-pointer",
+          size === "sm" ? "px-3 py-1.5 text-[12px]" : "px-3 py-2",
+          error ? "!border-[#DE350B] focus:ring-[#DE350B]" : "border-[#DFE1E6]",
+          open && "ring-1 ring-[#4C9AFF] border-[#4C9AFF]",
+          disabled && "opacity-50 cursor-not-allowed bg-[#F4F5F7]",
           triggerClassName
         )}
       >
-        <span className={cn("flex-1 text-left min-w-0 truncate", !selected && "text-muted-foreground/50")}>
+        <span className={cn("flex-1 text-left min-w-0 truncate text-[#172B4D]", !selected && "text-[#6B778C]/60")}>
           {selected ? (
             <span className="flex items-center gap-2 truncate">
-              {selected.icon}
+              {selected.icon && <span className="shrink-0 scale-90">{selected.icon}</span>}
               <span className="truncate">{selected.label}</span>
             </span>
           ) : (
@@ -97,7 +97,7 @@ export function AnimatedDropdown({
         <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }}>
           <ChevronDown
             className={cn(
-              "w-4 h-4 text-muted-foreground",
+              "w-4 h-4 text-[#6B778C]",
               size === "sm" && "w-3.5 h-3.5"
             )}
           />
@@ -108,38 +108,35 @@ export function AnimatedDropdown({
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: openUpward ? 8 : -8, scale: 0.96 }}
+            initial={{ opacity: 0, y: openUpward ? 4 : -4, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: openUpward ? 8 : -8, scale: 0.96 }}
-            transition={{ duration: 0.15, ease: "easeOut" }}
+            exit={{ opacity: 0, y: openUpward ? 4 : -4, scale: 0.98 }}
+            transition={{ duration: 0.1, ease: "easeOut" }}
             className={cn(
-              "absolute left-0 z-[9999] w-full bg-popover border border-border rounded-xl shadow-xl overflow-hidden",
-              openUpward ? "bottom-full mb-1.5" : "top-full mt-1.5"
+              "absolute left-0 z-[9999] w-full bg-white border border-[#DFE1E6] rounded-[3px] shadow-lg overflow-hidden",
+              openUpward ? "bottom-full mb-1" : "top-full mt-1"
             )}
           >
-            <div className="max-h-[200px] overflow-y-auto py-1">
+            <div className="max-h-[220px] overflow-y-auto py-1 scrollbar-hide">
               {options.map((opt, i) => (
-                <motion.button
+                <button
                   key={opt.value}
                   type="button"
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.03, duration: 0.15 }}
                   onClick={() => {
                     onChange(opt.value);
                     setOpen(false);
                   }}
                   className={cn(
-                    "w-full flex items-center gap-2 px-3.5 py-2 text-sm font-medium transition-colors hover:bg-primary/5 cursor-pointer text-left",
-                    value === opt.value && "bg-primary/10 text-primary"
+                    "w-full flex items-center gap-2 px-3 py-2 text-[14px] font-medium transition-colors hover:bg-[#F4F5F7] cursor-pointer text-left",
+                    value === opt.value ? "bg-[#DEEBFF] text-[#0052CC]" : "text-[#172B4D]"
                   )}
                 >
-                  {opt.icon}
-                  {opt.label}
+                  {opt.icon && <span className="shrink-0 scale-90">{opt.icon}</span>}
+                  <span className="flex-1 truncate">{opt.label}</span>
                   {value === opt.value && (
-                    <span className="ml-auto text-[10px]">✓</span>
+                    <span className="ml-auto text-[10px] font-bold text-[#0052CC]">✓</span>
                   )}
-                </motion.button>
+                </button>
               ))}
             </div>
           </motion.div>

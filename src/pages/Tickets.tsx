@@ -93,6 +93,10 @@ const Tickets = () => {
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [descriptionTarget, setDescriptionTarget] = useState<Ticket | null>(null);
   const [showFullDesc, setShowFullDesc] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -129,7 +133,7 @@ const Tickets = () => {
       setTickets(response.data);
       setPagination(response.pagination);
     } catch (err) {
-      toast({ title: "❌ Error", description: "Failed to load tickets", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to load tickets", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -291,7 +295,7 @@ const Tickets = () => {
     // Validate in order — stop at first error
     const showErr = (field: string, msg: string, toastMsg: string) => {
       setErrors({ [field]: msg });
-      toast({ title: "⚠️ Validation Error", description: toastMsg, variant: "destructive" });
+      toast({ title: "Validation Error", description: toastMsg, variant: "destructive" });
     };
 
     if (!editData.title?.trim()) {
@@ -343,10 +347,16 @@ const Tickets = () => {
 
     // All valid — clear errors and save
     setErrors({});
+    const startTime = Date.now();
+    setIsSaving(true);
 
     try {
       const payload = {
-        ...editData,
+        title: editData.title,
+        description: editData.description,
+        type: editData.type,
+        priority: editData.priority,
+        projectId: editData.projectId,
         startDate: editData.startDate || null,
         endDate: editData.endDate || null,
         assignees: editData.assignees?.map(a => {
@@ -358,37 +368,38 @@ const Tickets = () => {
 
       if (editingId) {
         await ticketService.update(editingId, payload);
-        toast({ title: "✅ Ticket Updated", description: `${editData.title} has been updated.` });
-
-        // Update descriptionTarget manually in case it's filtered out of the list refresh
-        if (descriptionTarget?.id === editingId) {
-          // We can't easily reconstruct the full ticket from payload (missing ticketId etc)
-          // so we fetch the updated list and wait for useEffect, 
-          // but if we want to be safe for filtered cases, we could combine prev with payload.
-          setDescriptionTarget(prev => prev ? ({ ...prev, ...payload }) : null);
-        }
+        toast({ title: "Ticket Updated", description: `${editData.title} has been updated.`, variant: "success" });
       } else {
         await ticketService.create(payload);
-        toast({ title: "🎉 Ticket Raised", description: `${editData.title} has been created.` });
+        toast({ title: "Ticket Created", description: `${editData.title} has been created.`, variant: "success" });
       }
       fetchTickets();
       setDialogOpen(false);
     } catch (err) {
-      toast({ title: "❌ Error", description: "Failed to save ticket", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to save ticket", variant: "destructive" });
+    } finally {
+      const elapsed = Date.now() - startTime;
+      setTimeout(() => setIsSaving(false), Math.max(0, 1500 - elapsed));
     }
   };
 
   const handleDelete = async () => {
-    if (deleteTarget) {
-      try {
-        await ticketService.delete(deleteTarget.id);
-        toast({ title: "🗑️ Ticket Deleted", variant: "destructive" });
-        fetchTickets();
-      } catch (err) {
-        toast({ title: "❌ Error", description: "Failed to delete ticket", variant: "destructive" });
-      }
+    if (!deleteTarget) return;
+    const startTime = Date.now();
+    setIsDeleting(true);
+    try {
+      await ticketService.delete(deleteTarget.id);
+      toast({ title: "Ticket Deleted", variant: "success" });
+      fetchTickets();
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to delete ticket", variant: "destructive" });
+    } finally {
+      const elapsed = Date.now() - startTime;
+      setTimeout(() => {
+        setIsDeleting(false);
+        setDeleteTarget(null);
+      }, Math.max(0, 1500 - elapsed));
     }
-    setDeleteTarget(null);
   };
 
   const changeStatus = async (ticketId: number, newStatus: string) => {
@@ -401,6 +412,8 @@ const Tickets = () => {
       }
     }
 
+    const startTime = Date.now();
+    setIsUpdatingStatus(true);
     try {
       await ticketService.updateStatus(ticketId, newStatus);
 
@@ -410,18 +423,19 @@ const Tickets = () => {
         setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: newStatus, closedAt: null } : t));
       }
 
-      if (descriptionTarget?.id === ticketId) {
-        setDescriptionTarget(prev => prev ? ({ ...prev, status: newStatus, closedAt: null }) : null);
-      }
-
-      toast({ title: "Status Changed", description: `Ticket moved to ${newStatus}` });
+      toast({ title: "Status Changed", description: `Ticket moved to ${newStatus}`, variant: "success" });
     } catch (err) {
-      toast({ title: "❌ Error", description: "Failed to update status", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to update status", variant: "destructive" });
+    } finally {
+      const elapsed = Date.now() - startTime;
+      setTimeout(() => setIsUpdatingStatus(false), Math.max(0, 1500 - elapsed));
     }
   };
 
   const confirmClose = async () => {
     if (!closeTarget) return;
+    const startTime = Date.now();
+    setIsClosing(true);
     try {
       await ticketService.update(closeTarget.id, {
         ...closeTarget,
@@ -436,14 +450,16 @@ const Tickets = () => {
         setTickets(prev => prev.map(t => t.id === closeTarget.id ? { ...t, status: "Closed", closedAt: manualCloseDate } : t));
       }
 
-      if (descriptionTarget?.id === closeTarget.id) {
-        setDescriptionTarget(prev => prev ? ({ ...prev, status: "Closed", closedAt: manualCloseDate }) : null);
-      }
 
-      toast({ title: "✅ Ticket Closed", description: `Closed date: ${manualCloseDate}` });
-      setCloseTarget(null);
+      toast({ title: "Ticket Closed", description: `Closed date: ${manualCloseDate}`, variant: "success" });
     } catch (err) {
-      toast({ title: "❌ Error", description: "Failed to close ticket", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to close ticket", variant: "destructive" });
+    } finally {
+      const elapsed = Date.now() - startTime;
+      setTimeout(() => {
+        setIsClosing(false);
+        setCloseTarget(null);
+      }, Math.max(0, 1500 - elapsed));
     }
   };
 
@@ -462,20 +478,28 @@ const Tickets = () => {
 
 
   const typeColor: Record<string, string> = {
-    Bug: "bg-destructive/10 text-destructive border-destructive/20",
-    Feature: "bg-primary/10 text-primary border-primary/20",
-    Improvement: "bg-info/10 text-info border-info/20",
-    Task: "bg-muted text-muted-foreground border-border",
+    Bug: "bg-[#FFEBE6] text-[#BF2600] border-[#FFBDAD]",
+    Feature: "bg-[#EAE6FF] text-[#403294] border-[#C0B6F2]",
+    Improvement: "bg-[#DEEBFF] text-[#0052CC] border-[#B3D4FF]",
+    Task: "bg-[#E3FCEF] text-[#006644] border-[#ABF5D1]",
+  };
+
+  const statusColor: Record<string, string> = {
+    "All": "text-[#42526E]",
+    "Open": "text-[#42526E] bg-[#DFE1E6]",
+    "In Progress": "text-[#0052CC] bg-[#DEEBFF]",
+    "On Hold": "text-[#BF2600] bg-[#FFEBE6]",
+    "Closed": "text-[#006644] bg-[#E3FCEF]",
   };
 
   return (
     <AppLayout title="Tickets" subtitle="Track bugs, features, and improvements">
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-[#F4F5F7]">
         <div
           className="flex-1 overflow-y-auto premium-scrollbar scroll-smooth"
           onScroll={handleScroll}
         >
-          <div className="sticky top-0 z-20">
+          <div className="sticky top-0 z-20 bg-white border-b border-border/60">
             <ProjectTabs
               projects={projects}
               activeProjectId={projectFilter}
@@ -484,13 +508,13 @@ const Tickets = () => {
             />
           </div>
 
-          <div className="max-w-[1400px] mx-auto w-full flex flex-col px-4 sm:px-6 lg:px-8 py-3 gap-3">
+          <div className="max-w-[1400px] mx-auto w-full flex flex-col px-4 sm:px-6 lg:px-8 py-4 gap-4">
 
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-4">
               {/* Primary Row: Status + Search + Action */}
               <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-4 w-full lg:w-auto">
-                  <div className="flex bg-muted/30 p-1 rounded-xl border border-border/50 h-9 items-center overflow-x-auto scrollbar-hide">
+                  <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
                     {allStatuses.map((s) => {
                       const active = statusFilter === s;
                       return (
@@ -498,18 +522,13 @@ const Tickets = () => {
                           key={s}
                           onClick={() => { setStatusFilter(s); setPage(1); }}
                           className={cn(
-                            "relative px-3.5 py-1 text-[11px] font-bold transition-all duration-300 rounded-lg whitespace-nowrap flex-1 lg:flex-none h-7 flex items-center justify-center capitalize",
-                            active ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                            "px-3 py-1.5 text-[13px] font-medium transition-all duration-200 rounded-[3px] whitespace-nowrap",
+                            active
+                              ? "bg-[#0052CC] text-white"
+                              : "text-[#42526E] hover:bg-[#EBECF0] hover:text-[#172B4D]"
                           )}
                         >
-                          <span className="relative z-10">{s}</span>
-                          {active && (
-                            <motion.div
-                              layoutId="activeStatus"
-                              className="absolute inset-0 bg-primary rounded-lg shadow-[0_2px_8px_rgba(var(--primary),0.3)]"
-                              transition={{ type: "spring", bounce: 0.1, duration: 0.4 }}
-                            />
-                          )}
+                          {s}
                         </button>
                       );
                     })}
@@ -520,35 +539,35 @@ const Tickets = () => {
                       options={allTypes}
                       value={typeFilter}
                       onChange={v => { setTypeFilter(v); setPage(1); }}
-                      allLabel="All Types"
-                      triggerClassName="border-border/50 border !rounded-xl h-9 !bg-transparent text-xs font-bold shadow-none min-w-[120px] px-4"
+                      allLabel="Type"
+                      triggerClassName="border-border border !rounded-[3px] h-8 !bg-white text-[13px] font-medium shadow-none min-w-[100px] px-3"
                     />
                     <FilterDropdown
                       options={allPriorities}
                       value={priorityFilter}
                       onChange={v => { setPriorityFilter(v); setPage(1); }}
-                      allLabel="All Priorities"
-                      triggerClassName="border-border/50 border !rounded-xl h-9 !bg-transparent text-xs font-bold shadow-none min-w-[120px] px-4"
+                      allLabel="Priority"
+                      triggerClassName="border-border border !rounded-[3px] h-8 !bg-white text-[13px] font-medium shadow-none min-w-[100px] px-3"
                     />
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 w-full lg:w-auto">
-                  <div className="flex-1 lg:w-64 flex bg-muted/30 p-1 rounded-xl border border-border/50 h-9 transition-all duration-200 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary focus-within:bg-card">
+                  <div className="flex-1 lg:w-56 h-8">
                     <SearchBar
                       value={search}
                       onChange={v => { setSearch(v); setPage(1); }}
                       placeholder="Search tickets..."
-                      className="w-full h-full"
-                      inputClassName="h-full !py-0 !rounded-lg !bg-transparent border-none focus:ring-0 shadow-none"
+                      className="h-full"
+                      inputClassName="h-full !py-1 !rounded-[3px] !bg-white border-border focus:ring-1 focus:ring-[#0052CC] focus:border-[#0052CC] shadow-none !text-[13px]"
                     />
                   </div>
                   <Button
                     onClick={openCreate}
-                    className="gap-2 rounded-xl px-5 h-9 shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground border-none shadow-sm transition-all"
+                    className="gap-2 rounded-[3px] px-4 h-8 shrink-0 bg-[#0052CC] hover:bg-[#0747A6] text-white border-none shadow-sm transition-all"
                   >
-                    <Plus className="w-4 h-4" />
-                    <span className="font-bold text-xs">Rise Ticket</span>
+                    <Plus className="w-3.5 h-3.5" />
+                    <span className="font-semibold text-[13px]">Create</span>
                   </Button>
                 </div>
               </div>
@@ -557,7 +576,7 @@ const Tickets = () => {
                 {/* Member filter: only visible to privileged roles */}
                 {isPrivileged && (
                   <div className="flex items-center gap-2">
-                    <div className="flex !bg-transparent px-1 rounded-xl border border-border h-9 items-center group">
+                    <div className="flex bg-white px-1 rounded-[3px] border border-border h-8 items-center group shadow-sm">
                       <AnimatedDropdown
                         size="sm"
                         options={[
@@ -566,28 +585,21 @@ const Tickets = () => {
                         ]}
                         value={employeeFilter}
                         onChange={v => { setEmployeeFilter(v); setPage(1); }}
-                        placeholder="Select Member"
-                        className="min-w-[140px]"
-                        triggerClassName="border-none !h-7 !bg-transparent text-xs font-bold shadow-none !px-3"
+                        placeholder="Member"
+                        className="min-w-[120px]"
+                        triggerClassName="border-none !h-7 !bg-transparent text-[12px] font-medium shadow-none !px-2"
                       />
-                      <div className="w-px h-4 bg-border/40" />
+                      <div className="w-px h-4 bg-border/60 mx-1" />
                       <button
                         onClick={() => { setEmployeeFilter(currentUser?.id?.toString() ?? "All"); setPage(1); }}
                         className={cn(
-                          "relative px-4 h-7 text-xs font-bold transition-all duration-300 rounded-lg whitespace-nowrap ml-1",
+                          "px-3 h-6 text-[12px] font-bold transition-all duration-200 rounded-[2px] whitespace-nowrap",
                           employeeFilter === currentUser?.id?.toString()
-                            ? "text-primary-foreground"
-                            : "text-muted-foreground hover:text-foreground"
+                            ? "bg-[#0052CC] text-white"
+                            : "text-[#42526E] hover:text-[#172B4D]"
                         )}
                       >
-                        <span className="relative z-10">My Tickets</span>
-                        {employeeFilter === currentUser?.id?.toString() && (
-                          <motion.div
-                            layoutId="activeEmployee"
-                            className="absolute inset-0 bg-primary rounded-lg shadow-sm"
-                            transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
-                          />
-                        )}
+                        My Tickets
                       </button>
                     </div>
                   </div>
@@ -595,36 +607,33 @@ const Tickets = () => {
 
                 {/* Date Filter */}
                 <div className="flex items-center gap-2">
-                  <div className="flex !bg-transparent px-1 rounded-xl border border-border h-9 items-center">
-                    <div className="flex items-center gap-2 px-3 h-7">
+                  <div className="flex bg-white px-1 rounded-[3px] border border-border h-8 items-center shadow-sm">
+                    <div className="flex items-center gap-2 px-2 h-7">
                       <AnimatedDatePicker
                         value={startDateFilter}
                         onChange={v => { setStartDateFilter(v); setPage(1); }}
                         className="border-none !p-0"
-                        triggerClassName="border-none !p-0 !h-auto bg-transparent shadow-none hover:bg-transparent !ring-0 text-xs font-bold"
+                        triggerClassName="border-none !p-0 !h-auto bg-transparent shadow-none hover:bg-transparent !ring-0 text-[12px] font-medium"
                         placeholder="Start Date"
                       />
                     </div>
-                    <div className="w-px h-4 bg-border/40" />
-                    <div className="flex items-center gap-2 px-3 h-7">
+                    <div className="w-px h-4 bg-border/60" />
+                    <div className="flex items-center gap-2 px-2 h-7">
                       <AnimatedDatePicker
                         value={endDateFilter}
                         onChange={v => { setEndDateFilter(v); setPage(1); }}
                         className="border-none !p-0"
-                        triggerClassName="border-none !p-0 !h-auto bg-transparent shadow-none hover:bg-transparent !ring-0 text-xs font-bold"
+                        triggerClassName="border-none !p-0 !h-auto bg-transparent shadow-none hover:bg-transparent !ring-0 text-[12px] font-medium"
                         placeholder="Due Date"
                       />
                     </div>
                     {(startDateFilter || endDateFilter) && (
-                      <>
-                        <div className="w-px h-4 bg-border/40 mx-1" />
-                        <button
-                          onClick={() => { setStartDateFilter(""); setEndDateFilter(""); setPage(1); }}
-                          className="w-8 h-7 flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </>
+                      <button
+                        onClick={() => { setStartDateFilter(""); setEndDateFilter(""); setPage(1); }}
+                        className="w-6 h-6 flex items-center justify-center text-[#42526E] hover:text-[#DE350B] transition-colors ml-1"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
                     )}
                   </div>
                 </div>
@@ -632,27 +641,27 @@ const Tickets = () => {
             </div>
 
             {/* Table Content */}
-            <div className="animate-fade-in border border-border/60 rounded-2xl bg-card/10 shadow-sm overflow-hidden">
+            <div className="animate-fade-in border border-border bg-white rounded-[3px] shadow-sm overflow-hidden">
               <div className="overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: "none" }}>
-                <table className="w-full text-sm min-w-[1100px]">
+                <table className="w-full text-[14px] min-w-[1100px]">
                   <thead>
-                    <tr className="border-b border-border/60">
-                      <th className="text-left py-4 px-6 font-semibold text-[13px] text-slate-500/80 whitespace-nowrap">Ticket ID</th>
-                      <th className="text-left py-4 px-4 font-semibold text-[13px] text-slate-500/80 whitespace-nowrap">Title</th>
-                      <th className="text-left py-4 px-4 font-semibold text-[13px] text-slate-500/80 whitespace-nowrap">Type</th>
-                      <th className="text-left py-4 px-4 font-semibold text-[13px] text-slate-500/80 whitespace-nowrap">Status</th>
-                      <th className="text-left py-4 px-4 font-extrabold text-[14px] text-slate-900 whitespace-nowrap">Assignee</th>
-                      <th className="text-left py-4 px-4 font-semibold text-[13px] text-slate-500/80 whitespace-nowrap">Priority</th>
-                      <th className="text-left py-4 px-4 font-semibold text-[13px] text-slate-500/80 whitespace-nowrap">Start Date</th>
-                      <th className="text-left py-4 px-4 font-semibold text-[13px] text-slate-500/80 whitespace-nowrap">Due Date</th>
+                    <tr className="border-b border-border bg-white text-[#42526E]">
+                      <th className="text-left py-2 px-4 font-bold text-[12px]  tracking-wider text-[#6B778C] bg-[#F4F5F7] whitespace-nowrap border-b border-border/60">ID</th>
+                      <th className="text-left py-2 px-4 font-bold text-[12px]  tracking-wider text-[#6B778C] bg-[#F4F5F7] whitespace-nowrap border-b border-border/60">Summary</th>
+                      <th className="text-left py-2 px-4 font-bold text-[12px]  tracking-wider text-[#6B778C] bg-[#F4F5F7] whitespace-nowrap border-b border-border/60">Type</th>
+                      <th className="text-left py-2 px-4 font-bold text-[12px]  tracking-wider text-[#6B778C] bg-[#F4F5F7] whitespace-nowrap border-b border-border/60">Status</th>
+                      <th className="text-left py-2 px-4 font-bold text-[12px]  tracking-wider text-[#6B778C] bg-[#F4F5F7] whitespace-nowrap border-b border-border/60">Assignee</th>
+                      <th className="text-left py-2 px-4 font-bold text-[12px]  tracking-wider text-[#6B778C] bg-[#F4F5F7] whitespace-nowrap border-b border-border/60">Priority</th>
+                      <th className="text-left py-2 px-4 font-bold text-[12px]  tracking-wider text-[#6B778C] bg-[#F4F5F7] whitespace-nowrap border-b border-border/60">Created</th>
+                      <th className="text-left py-2 px-4 font-bold text-[12px]  tracking-wider text-[#6B778C] bg-[#F4F5F7] whitespace-nowrap border-b border-border/60">Due Date</th>
                     </tr>
                   </thead>
                   <tbody>
                     {loading ? (
                       Array(5).fill(0).map((_, idx) => (
-                        <tr key={idx} className="border-t border-slate-50 animate-pulse">
+                        <tr key={idx} className="border-t border-border animate-pulse bg-white">
                           {Array(8).fill(0).map((__, tdIdx) => (
-                            <td key={tdIdx} className="p-4"><div className="h-4 bg-slate-50 rounded w-full" /></td>
+                            <td key={tdIdx} className="p-4"><div className="h-3 bg-gray-100 rounded w-full" /></td>
                           ))}
                         </tr>
                       ))
@@ -662,120 +671,84 @@ const Tickets = () => {
                           key={t.id}
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
-                          transition={{ delay: i * 0.03 }}
-                          className="group border-t border-border/50 hover:bg-primary/[0.02] transition-colors cursor-pointer"
+                          transition={{ delay: i * 0.02 }}
+                          className="group border-t border-border/60 hover:bg-[#F4F5F7] transition-colors cursor-pointer bg-white"
                           onClick={() => setDescriptionTarget(t)}
                         >
-                          <td className="py-4 px-6">
-                            <span className="text-[12px] text-slate-400 font-medium tracking-tight whitespace-nowrap">{t.ticketId}</span>
+                          <td className="py-2.5 px-4">
+                            <span className="text-[12px] text-[#42526E] font-medium whitespace-nowrap">{t.ticketId}</span>
                           </td>
-                          <td className="py-4 px-4 min-w-[160px] max-w-[260px] w-[20vw] overflow-hidden">
-                            <span className="font-medium text-[14px] text-slate-800 tracking-tight truncate block">{t.title}</span>
+                          <td className="py-2.5 px-4 min-w-[200px] max-w-[350px]">
+                            <span className="font-medium text-[14px] text-[#0052CC] hover:underline tracking-tight truncate block">{t.title}</span>
                           </td>
-                          <td className="py-4 px-4">
-                            <span className={cn("text-[11px] font-bold px-2 py-1 rounded border whitespace-nowrap capitalize tracking-tighter",
-                              t.type === "Bug" ? "bg-red-50 text-red-500 border-red-100" :
-                                t.type === "Feature" ? "bg-blue-50 text-blue-500 border-blue-100" :
-                                  t.type === "Task" ? "bg-slate-50 text-slate-500 border-slate-100" :
-                                    "bg-amber-50 text-amber-600 border-amber-100"
+                          <td className="py-2.5 px-4">
+                            <span className={cn("text-[11px] font-bold px-1.5 py-0.5 rounded-[2px] border whitespace-nowrap flex items-center gap-1 w-fit",
+                              typeColor[t.type] || "bg-gray-50 text-gray-500 border-gray-100"
                             )}>
+                              <span>{t.type === 'Bug' ? '🐛' : t.type === 'Feature' ? '✨' : t.type === 'Improvement' ? '🔧' : '📋'}</span>
                               {t.type}
                             </span>
                           </td>
-                          <td className="py-4 px-4">
-                            <div className="flex items-center gap-2">
-                              <span className={cn("w-2 h-2 rounded-full",
-                                t.status === "Closed" ? "bg-emerald-500" :
-                                  t.status === "In Progress" ? "bg-blue-500" :
-                                    t.status === "On Hold" ? "bg-amber-500" : "bg-slate-300"
-                              )} />
-                              <span className="text-[13px] font-medium text-slate-600 whitespace-nowrap">{t.status}</span>
-                            </div>
+                          <td className="py-2.5 px-4">
+                            <span className={cn("text-[11px] font-bold px-2 py-0.5 rounded-[3px] whitespace-nowrap flex items-center gap-1 w-fit",
+                              statusColor[t.status] || "bg-[#DFE1E6] text-[#42526E]"
+                            )}>
+                              <span>{t.status === 'Open' ? '⭕' : t.status === 'In Progress' ? '🔵' : t.status === 'On Hold' ? '🟠' : '✅'}</span>
+                              {t.status}
+                            </span>
                           </td>
-                          <td className="py-4 px-4">
-                            <div className="flex -space-x-2 items-center">
+                          <td className="py-2.5 px-4">
+                            <div className="flex -space-x-1.5 items-center">
                               {t.assignees && t.assignees.length > 0 ? (
-                                <>
-                                  <TooltipProvider delayDuration={0}>
-                                    {t.assignees.map((a: any, idx: number) => {
-                                      const isMe = Number(a.id) === Number(currentUser?.id);
-                                      return (
-                                        <Tooltip key={idx}>
-                                          <TooltipTrigger asChild>
-                                            <div
-                                              className={cn(
-                                                "w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold border-[1.5px] transition-transform hover:scale-110 cursor-help",
-                                                isMe ? "bg-primary text-white z-10 border-primary shadow-sm" : "bg-slate-50 text-slate-500 z-0 border-slate-300"
-                                              )}
-                                            >
-                                              {a.username.slice(0, 1).toUpperCase()}
-                                            </div>
-                                          </TooltipTrigger>
-                                          <TooltipContent side="top" className="bg-white text-slate-600 border border-slate-200 py-1.5 px-3 text-[11px] font-bold rounded-lg shadow-xl mb-1">
-                                            <p>{a.username}</p>
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      );
-                                    })}
-                                  </TooltipProvider>
-                                </>
+                                <TooltipProvider delayDuration={0}>
+                                  {t.assignees.map((a: any, idx: number) => {
+                                    const isMe = Number(a.id) === Number(currentUser?.id);
+                                    return (
+                                      <Tooltip key={idx}>
+                                        <TooltipTrigger asChild>
+                                          <div
+                                            className={cn(
+                                              "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white transition-all transform hover:-translate-y-0.5 cursor-help",
+                                              isMe ? "bg-[#0052CC] text-white z-10 shadow-sm" : "bg-[#DFE1E6] text-[#42526E] z-0"
+                                            )}
+                                          >
+                                            {a.username.slice(0, 1).toUpperCase()}
+                                          </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" className="bg-[#172B4D] text-white border-none py-1 px-2 text-[11px] font-medium rounded-[3px] shadow-lg mb-1">
+                                          <p>{a.username}</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    );
+                                  })}
+                                </TooltipProvider>
                               ) : (
-                                <span className="text-[12px] text-slate-300 italic whitespace-nowrap">Unassigned</span>
+                                <span className="text-[12px] text-gray-300 italic whitespace-nowrap">Unassigned</span>
                               )}
                             </div>
                           </td>
-                          <td className="py-4 px-4">
-                            <div className="flex items-center gap-2">
-                              <span className={cn("w-2 h-2 rounded-full",
-                                t.priority === "Critical" ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.2)]" :
-                                  t.priority === "High" ? "bg-orange-500" :
-                                    t.priority === "Medium" ? "bg-amber-400" : "bg-blue-400"
+                          <td className="py-2.5 px-4">
+                            <div className="flex items-center gap-1.5">
+                              <span className={cn("w-1.5 h-1.5 rounded-full",
+                                t.priority === "Critical" ? "bg-[#DE350B]" :
+                                  t.priority === "High" ? "bg-[#FF8B00]" :
+                                    t.priority === "Medium" ? "bg-[#FFC400]" : "bg-[#00B8D9]"
                               )} />
-                              <span className="text-[13px] font-medium text-slate-600 whitespace-nowrap">{t.priority}</span>
+                              <span className="text-[13px] text-[#42526E] whitespace-nowrap">{t.priority}</span>
                             </div>
                           </td>
-                          <td className="py-4 px-4">
-                            <div className="flex flex-col gap-0.5">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[13px] font-medium text-slate-400 whitespace-nowrap">{t.startDate ? format(new Date(t.startDate), "MMM d, yyyy") : "—"}</span>
-                                {(() => {
-                                  const collabDates = t.assignees?.filter(a => a.TicketAssignee?.joinDate && a.TicketAssignee.joinDate !== t.startDate);
-                                  if (!collabDates || collabDates.length === 0) return null;
-                                  return (
-                                    <TooltipProvider>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <div className="cursor-help flex items-center justify-center p-1 hover:bg-indigo-50 rounded-sm transition-colors">
-                                            <Users className="w-3.5 h-3.5 text-indigo-400" />
-                                          </div>
-                                        </TooltipTrigger>
-                                        <TooltipContent side="top" className="p-2 min-w-[150px] rounded-xl border-indigo-100 shadow-xl">
-                                          <div className="space-y-1.5">
-                                            <p className="text-[10px] font-bold text-indigo-500 tracking-tight mb-1 border-b border-indigo-50 pb-1">Collaborative Join Dates</p>
-                                            {collabDates.map((a, i) => (
-                                              <div key={i} className="flex items-center justify-between gap-4">
-                                                <span className="text-[11px] font-bold text-slate-600">{a.username}</span>
-                                                <span className="text-[11px] font-medium text-slate-400">{format(new Date(a.TicketAssignee.joinDate), "MMM d")}</span>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </TooltipProvider>
-                                  );
-                                })()}
-                              </div>
-                            </div>
+                          <td className="py-2.5 px-4">
+                            <span className="text-[13px] text-[#6B778C] whitespace-nowrap">{t.startDate ? format(new Date(t.startDate), "MMM d, yyyy") : "—"}</span>
                           </td>
-                          <td className="py-4 px-4">
-                            <span className={cn("text-[13px] font-semibold tracking-tight whitespace-nowrap",
+                          <td className="py-2.5 px-4">
+                            <span className={cn("text-[13px] font-medium whitespace-nowrap",
                               (() => {
-                                if (t.status === "Closed") return "text-emerald-500";
-                                if (!t.endDate) return "text-slate-400";
+                                if (t.status === "Closed") return "text-[#006644]";
+                                if (!t.endDate) return "text-[#6B778C]";
                                 const dueDate = new Date(t.endDate);
-                                if (isPast(dueDate)) return "text-red-500";
-                                if (differenceInHours(dueDate, new Date()) <= 12) return "text-orange-500";
-                                return "text-slate-400";
+                                if (isPast(dueDate)) return "text-[#DE350B]";
+                                if (differenceInHours(dueDate, new Date()) <= 12) return "text-[#FF8B00]";
+                                return "text-[#6B778C]";
                               })()
                             )}>
                               {t.endDate ? format(new Date(t.endDate), "MMM d, yyyy") : "—"}
@@ -790,11 +763,12 @@ const Tickets = () => {
             </div>
 
             {!loading && tickets.length === 0 && (
-              <div className="text-center py-16 animate-fade-in">
-                <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-                  <Bug className="w-8 h-8 text-muted-foreground" />
+              <div className="bg-white border border-border rounded-[3px] p-12 text-center animate-fade-in shadow-sm">
+                <div className="w-12 h-12 rounded-lg bg-[#F4F5F7] flex items-center justify-center mx-auto mb-4">
+                  <Bug className="w-6 h-6 text-[#6B778C]" />
                 </div>
-                <p className="text-muted-foreground font-medium">No tickets found</p>
+                <p className="text-[#172B4D] font-semibold text-lg">No tickets found</p>
+                <p className="text-[#6B778C] text-sm mt-1">Try adjusting your filters or search terms.</p>
               </div>
             )}
 
@@ -833,7 +807,7 @@ const Tickets = () => {
                   key="ticket-form"
                   open={dialogOpen}
                   onClose={() => setDialogOpen(false)}
-                  title={editingId ? "Edit Ticket" : "Rise Ticket"}
+                  title={editingId ? "Edit ticket" : "Create ticket"}
                   subtitle={editingId ? "Update ticket details" : "Create a new support or task ticket"}
                   onSave={handleSave}
                   editData={editData}
@@ -855,6 +829,7 @@ const Tickets = () => {
                   projects={projects}
                   onClose={() => setDescriptionTarget(null)}
                   onUpdateStatus={changeStatus}
+                  isUpdating={isUpdatingStatus}
                   onExtendDueDate={handleExtendDueDate}
                   onEdit={(t) => {
                     openEdit(t);
@@ -878,7 +853,7 @@ const Tickets = () => {
               </DialogHeader>
               <div className="py-4 space-y-4">
                 <p className="text-sm text-muted-foreground font-medium leading-relaxed">
-                  You are moving <span className="text-foreground font-bold">{closeTarget?.ticketId}</span> to <span className="text-success font-bold uppercase tracking-wider">Closed</span>. Please confirm the completion date.
+                  You are moving <span className="text-foreground font-bold">{closeTarget?.ticketId}</span> to <span className="text-success font-bold">Closed</span>. Please confirm the completion date.
                 </p>
                 <FormField label="Completion Date" icon={Calendar}>
                   <AnimatedDatePicker

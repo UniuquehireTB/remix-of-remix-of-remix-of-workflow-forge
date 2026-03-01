@@ -43,6 +43,7 @@ interface AnimatedDatePickerProps {
   minDate?: string;
   maxDate?: string;
   showIcon?: boolean;
+  icon?: React.ReactNode;
 }
 
 export function AnimatedDatePicker({
@@ -57,6 +58,7 @@ export function AnimatedDatePicker({
   minDate,
   maxDate,
   showIcon = true,
+  icon,
 }: AnimatedDatePickerProps) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<View>("day");
@@ -151,26 +153,24 @@ export function AnimatedDatePicker({
               type="button"
               disabled={disabled}
               className={cn(
-                "w-full flex items-center border-2 rounded-xl bg-background px-3.5 py-2.5 text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary",
+                "w-full flex items-center border rounded-[3px] bg-[#FAFBFC] px-3 py-2 text-[14px] font-medium transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-[#4C9AFF] focus:border-[#4C9AFF] focus:bg-white",
                 (selected || placeholder) && "gap-2",
-                error ? "!border-destructive focus:ring-destructive/20" : "border-input",
-                open && "ring-2 ring-primary/20 border-primary",
+                error ? "!border-[#DE350B] focus:ring-[#DE350B]" : "border-[#DFE1E6]",
+                open && "ring-1 ring-[#4C9AFF] border-[#4C9AFF] bg-white",
                 selected && "pr-8",
-                disabled ? "bg-muted/50 cursor-not-allowed border-muted" : "hover:border-primary/30",
+                disabled ? "bg-[#F4F5F7] cursor-not-allowed border-none" : "hover:bg-[#EBECF0]",
                 triggerClassName
               )}
             >
-              {showIcon && <CalendarIcon className="w-3.5 h-3.5 shrink-0 text-muted-foreground/40" />}
+              {showIcon && (icon || <CalendarIcon className="w-3.5 h-3.5 shrink-0 text-[#6B778C]" />)}
               {(selected || placeholder) && (
-                <span className={cn("truncate", !selected && "text-muted-foreground/50")}>
+                <span className={cn("truncate text-[#172B4D]", !selected && "text-[#6B778C]/60 italic font-normal")}>
                   {selected ? format(selected, "MMM dd, yyyy") : placeholder}
                 </span>
               )}
             </button>
           )}
         </DialogPrimitive.Trigger>
-
-
       </div>
 
       <DialogPrimitive.Portal>
@@ -181,30 +181,30 @@ export function AnimatedDatePicker({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+              className="absolute inset-0 bg-black/10 backdrop-blur-[1px]"
             />
           </DialogPrimitive.Overlay>
 
           <DialogPrimitive.Content asChild className="z-[10001] outline-none">
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 10 }}
+              initial={{ opacity: 0, scale: 0.98, y: 4 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 10 }}
-              className="relative bg-popover border border-border rounded-3xl shadow-2xl p-4 w-[310px] overflow-hidden"
+              exit={{ opacity: 0, scale: 0.98, y: 4 }}
+              className="relative bg-white border border-[#DFE1E6] rounded-[3px] shadow-2xl p-4 w-[310px] overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               {/* ── TOP BAR: title ── */}
-              <div className="flex items-center justify-between mb-3 px-1">
-                <DialogPrimitive.Title className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">
-                  Select Date
+              <div className="flex items-center justify-between mb-4 px-1">
+                <DialogPrimitive.Title className="text-[11px] font-bold text-[#6B778C]">
+                  Select date
                 </DialogPrimitive.Title>
-                <DialogPrimitive.Close className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground">
+                <DialogPrimitive.Close className="w-6 h-6 rounded-[3px] flex items-center justify-center hover:bg-[#F4F5F7] transition-colors text-[#6B778C]">
                   <X className="w-4 h-4" />
                 </DialogPrimitive.Close>
               </div>
 
               {/* ── NAV ROW ── */}
-              <div className="flex items-center justify-between mb-3 bg-muted/20 p-1 rounded-xl">
+              <div className="flex items-center justify-between mb-4 bg-[#F4F5F7] p-0.5 rounded-[3px] border border-[#DFE1E6]/50">
                 <button
                   type="button"
                   onClick={() => {
@@ -212,7 +212,7 @@ export function AnimatedDatePicker({
                     if (view === "month") setCurrentMonth((p) => setYear(p, currentYear - 1));
                     if (view === "year") setCurrentMonth((p) => setYear(p, yearBase - 12));
                   }}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-background transition-colors shrink-0"
+                  className="w-7 h-7 rounded-[2px] flex items-center justify-center hover:bg-white transition-colors shrink-0 text-[#42526E]"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -223,8 +223,8 @@ export function AnimatedDatePicker({
                       type="button"
                       onClick={() => setView(view === "month" ? "day" : "month")}
                       className={cn(
-                        "text-[10px] font-black px-2 py-1 rounded-lg transition-colors hover:bg-background uppercase tracking-tighter",
-                        view === "month" && "text-primary"
+                        "text-[12px] font-bold px-2 py-1 rounded-[2px] transition-colors hover:bg-white text-[#172B4D]",
+                        view === "month" && "text-[#0052CC]"
                       )}
                     >
                       {MONTH_FULL[getMonth(currentMonth)]}
@@ -234,8 +234,8 @@ export function AnimatedDatePicker({
                     type="button"
                     onClick={() => setView(view === "year" ? "day" : "year")}
                     className={cn(
-                      "text-[10px] font-black px-2 py-1 rounded-lg transition-colors hover:bg-background uppercase tracking-tighter",
-                      view === "year" && "text-primary"
+                      "text-[12px] font-bold px-2 py-1 rounded-[2px] transition-colors hover:bg-white text-[#172B4D]",
+                      view === "year" && "text-[#0052CC]"
                     )}
                   >
                     {view === "year" ? `${yearBase}–${yearBase + 11}` : currentYear}
@@ -249,7 +249,7 @@ export function AnimatedDatePicker({
                     if (view === "month") setCurrentMonth((p) => setYear(p, currentYear + 1));
                     if (view === "year") setCurrentMonth((p) => setYear(p, yearBase + 12));
                   }}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-background transition-colors shrink-0"
+                  className="w-7 h-7 rounded-[2px] flex items-center justify-center hover:bg-white transition-colors shrink-0 text-[#42526E]"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -261,7 +261,7 @@ export function AnimatedDatePicker({
                   <motion.div key="day-view" {...fadeSlide}>
                     <div className="grid grid-cols-7 mb-1">
                       {weekDays.map((d) => (
-                        <div key={d} className="text-center text-[9px] font-black text-muted-foreground/50 py-1 uppercase tracking-tighter">
+                        <div key={d} className="text-center text-[10px] font-bold text-[#6B778C]/70 py-1">
                           {d}
                         </div>
                       ))}
@@ -281,12 +281,12 @@ export function AnimatedDatePicker({
                             onClick={() => selectDay(day)}
                             disabled={isDisabled}
                             className={cn(
-                              "w-9 h-9 rounded-lg text-xs font-bold transition-all duration-150",
-                              sel && !isDisabled && "bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20",
-                              sel && isDisabled && "bg-destructive text-white shadow-lg shadow-destructive/20",
-                              todayDate && !sel && "bg-primary/10 text-primary font-black ring-1 ring-primary/20",
-                              !sel && !todayDate && !isDisabled && "text-foreground/80 hover:bg-primary/10",
-                              isDisabled && !sel && "text-muted-foreground/30 cursor-not-allowed"
+                              "w-9 h-9 rounded-[2px] text-[13px] font-semibold transition-all duration-150",
+                              sel && !isDisabled && "bg-[#0052CC] text-white hover:bg-[#0747A6] shadow-sm",
+                              sel && isDisabled && "bg-[#DE350B] text-white shadow-sm",
+                              todayDate && !sel && "text-[#0052CC] font-bold ring-1 ring-[#0052CC]/20 bg-[#DEEBFF]/50",
+                              !sel && !todayDate && !isDisabled && "text-[#172B4D] hover:bg-[#F4F5F7]",
+                              isDisabled && !sel && "text-[#DFE1E6] cursor-not-allowed"
                             )}
                           >
                             {format(day, "d")}
@@ -294,17 +294,17 @@ export function AnimatedDatePicker({
                         );
                       })}
                     </div>
-                    <div className="mt-4 pt-3 border-t border-border/40">
+                    <div className="mt-4 pt-4 border-t border-[#DFE1E6]/60">
                       <button
                         type="button"
                         onClick={() => { selectDay(new Date()); setCurrentMonth(new Date()); }}
                         disabled={isDateDisabled(new Date())}
                         className={cn(
-                          "w-full text-[9px] font-black uppercase tracking-[0.2em] text-primary py-2 rounded-xl transition-all",
-                          isDateDisabled(new Date()) ? "opacity-30 cursor-not-allowed" : "hover:bg-primary/5"
+                          "w-full text-[11px] font-bold text-[#0052CC] py-1.5 rounded-[2px] transition-all border border-transparent hover:border-[#B3D4FF] hover:bg-[#DEEBFF]/30",
+                          isDateDisabled(new Date()) ? "opacity-30 cursor-not-allowed" : ""
                         )}
                       >
-                        Jump to Today
+                        Today
                       </button>
                     </div>
                   </motion.div>

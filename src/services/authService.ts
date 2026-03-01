@@ -1,32 +1,70 @@
-// In production (Vercel), frontend and backend share the same domain.
-// In development, the backend runs on localhost:5000.
+// Track whether a refresh is in-flight to avoid cascading calls
+let _refreshing: Promise<void> | null = null;
+
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
+const doRequest = async (endpoint: string, options: any = {}): Promise<any> => {
+    const token = sessionStorage.getItem('token');
+    const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        ...options.headers,
+    };
+
+    const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
+    const data = await response.json();
+
+    return { response, data };
+};
+
 export const apiService = {
-    // Generic request helper that includes the JWT token
     request: async (endpoint: string, options: any = {}) => {
-        const token = sessionStorage.getItem('token');
-        const headers = {
-            'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-            ...options.headers,
-        };
+        // Skip auth-retry loop for login/refresh endpoints
+        const isAuthEndpoint = endpoint.includes('/auth/login') || endpoint.includes('/auth/refresh');
 
-        const response = await fetch(`${API_URL}${endpoint}`, {
-            ...options,
-            headers,
-        });
+        let { response, data } = await doRequest(endpoint, options);
 
-        const data = await response.json();
-
-        if (response.status === 401) {
-            // Only redirect if we're not already trying to login
-            if (!endpoint.includes('/auth/login')) {
+        // On 401, try to silently refresh and retry once
+        if (response.status === 401 && !isAuthEndpoint) {
+            try {
+                // If a refresh is already in flight, wait for it instead of firing another
+                if (!_refreshing) {
+                    _refreshing = (async () => {
+                        const refreshResp = await fetch(`${API_URL}/auth/refresh`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
+                            },
+                            body: JSON.stringify({}),
+                        });
+                        if (!refreshResp.ok) throw new Error('refresh_failed');
+                        const refreshData = await refreshResp.json();
+                        if (refreshData.token) {
+                            sessionStorage.setItem('token', refreshData.token);
+                            sessionStorage.setItem('user', JSON.stringify(refreshData.user));
+                        }
+                    })().finally(() => { _refreshing = null; });
+                }
+                await _refreshing;
+            } catch {
+                // Refresh also failed → force logout
                 sessionStorage.removeItem('token');
                 sessionStorage.removeItem('user');
                 window.location.href = '/login';
                 throw new Error('Session expired. Please login again.');
             }
+
+            // Retry the original request with the new token
+            ({ response, data } = await doRequest(endpoint, options));
+        }
+
+        // Still 401 after retry → give up
+        if (response.status === 401) {
+            sessionStorage.removeItem('token');
+            sessionStorage.removeItem('user');
+            window.location.href = '/login';
+            throw new Error('Session expired. Please login again.');
         }
 
         if (!response.ok) {
@@ -41,6 +79,7 @@ export const apiService = {
     put: (endpoint: string, body: any) => apiService.request(endpoint, { method: 'PUT', body: JSON.stringify(body) }),
     delete: (endpoint: string) => apiService.request(endpoint, { method: 'DELETE' }),
 };
+
 
 export const authService = {
     register: async (userData: any) => {

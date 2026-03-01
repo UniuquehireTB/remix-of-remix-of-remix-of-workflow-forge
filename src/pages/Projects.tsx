@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
-import { Plus, MoreHorizontal, Users, Pencil, Trash2, FolderKanban, Building2, FileText, LayoutGrid } from "lucide-react";
+import { Plus, MoreHorizontal, Users, Pencil, Trash2, FolderKanban, Building2, FileText, LayoutGrid, LifeBuoy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -45,6 +45,8 @@ const Projects = () => {
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
   const [editData, setEditData] = useState<Partial<Project>>(emptyProject());
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const currentUser = authService.getCurrentUser();
@@ -108,13 +110,15 @@ const Projects = () => {
     if (!editData.description?.trim()) e.description = "Description is required";
     setErrors(e);
     if (!skipToast && Object.keys(e).length > 0) {
-      toast({ title: "⚠️ Validation Error", description: Object.values(e).join(" • "), variant: "destructive" });
+      toast({ title: "Validation Error", description: Object.values(e).join(" • "), variant: "destructive" });
     }
     return Object.keys(e).length === 0;
   };
 
   const handleSave = async () => {
     if (!validate()) return;
+    const startTime = Date.now();
+    setIsSaving(true);
     try {
       const payload = {
         ...editData,
@@ -123,12 +127,11 @@ const Projects = () => {
 
       if (editingId) {
         await projectService.update(editingId, payload);
-        toast({ title: "✅ Project Updated", description: `${editData.name} has been updated successfully.` });
+        toast({ title: "Project Updated", description: `${editData.name} has been updated successfully.`, variant: "success" });
       } else {
         await projectService.create(payload);
-        toast({ title: "🎉 Project Created", description: `${editData.name} has been created successfully.` });
+        toast({ title: "Project Created", description: `${editData.name} has been created successfully.`, variant: "success" });
 
-        // If this was the first project, navigate to tickets
         if (projects.length === 0) {
           navigate("/tickets");
           return;
@@ -137,21 +140,31 @@ const Projects = () => {
       fetchProjects();
       setDialogOpen(false);
     } catch (err) {
-      toast({ title: "❌ Error", description: "Failed to save project", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to save project", variant: "destructive" });
+    } finally {
+      const elapsed = Date.now() - startTime;
+      setTimeout(() => setIsSaving(false), Math.max(0, 1500 - elapsed));
     }
   };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
+    const startTime = Date.now();
+    setIsDeleting(true);
     try {
       await projectService.delete(deleteTarget.id);
-      toast({ title: "🗑️ Project Deleted", description: `${deleteTarget.name} has been removed.`, variant: "destructive" });
+      toast({ title: "Project Deleted", description: `${deleteTarget.name} has been removed.`, variant: "success" });
 
       fetchProjects();
       if (descriptionTarget?.id === deleteTarget.id) setDescriptionTarget(null);
-      setDeleteTarget(null);
     } catch (err) {
-      toast({ title: "❌ Error", description: "Failed to delete project", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to delete project", variant: "destructive" });
+    } finally {
+      const elapsed = Date.now() - startTime;
+      setTimeout(() => {
+        setIsDeleting(false);
+        setDeleteTarget(null);
+      }, Math.max(0, 1500 - elapsed));
     }
   };
 
@@ -160,28 +173,23 @@ const Projects = () => {
       <div className="flex-1 overflow-y-auto premium-scrollbar px-4 sm:px-6 lg:px-8 py-6">
         <div className="max-w-[1400px] mx-auto w-full flex flex-col">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-6 py-1 w-full">
-            <div className="flex-1 max-w-md flex bg-muted/30 p-1 rounded-xl border border-border/50 h-9 transition-all duration-200 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary focus-within:bg-card">
+            <div className="flex-1 max-w-sm flex bg-white border border-border rounded-[3px] h-9 transition-all duration-200 focus-within:ring-1 focus-within:ring-[#0052CC] focus-within:border-[#0052CC] group">
               <SearchBar
                 value={search}
                 onChange={v => { setSearch(v); setPage(1); }}
-                placeholder="Search projects by title or client..."
+                placeholder="Search projects..."
                 className="w-full h-full"
-                inputClassName="h-full !py-0 !rounded-lg !bg-transparent border-none focus:ring-0 shadow-none"
+                inputClassName="h-full !py-0 !rounded-[2px] !bg-transparent border-none focus:ring-0 shadow-none text-[14px]"
               />
             </div>
             <div className="flex items-center gap-3">
-              {pagination.itemsLeft > 0 && (
-                <Badge variant="secondary" className="px-3 py-1.5 rounded-xl bg-primary/5 text-primary border-primary/10 h-9 flex items-center">
-                  {pagination.itemsLeft} items left
-                </Badge>
-              )}
               {canManage && (
                 <Button
                   onClick={openCreate}
-                  className="gap-2 rounded-xl shadow-lg shadow-primary/25 px-5 h-9 shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground border-none transition-all"
+                  className="gap-2 rounded-[3px] px-4 h-9 shrink-0 bg-[#0052CC] hover:bg-[#0747A6] text-white border-none transition-all font-bold text-[14px]"
                 >
                   <Plus className="w-4 h-4" />
-                  <span className="font-bold text-xs">Create Project</span>
+                  <span>Create Project</span>
                 </Button>
               )}
             </div>
@@ -190,7 +198,7 @@ const Projects = () => {
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-pulse">
               {[1, 2, 3, 4, 5, 6].map(i => (
-                <div key={i} className="h-48 bg-muted rounded-2xl" />
+                <div key={i} className="h-44 bg-[#F4F5F7] rounded-[3px] border border-border" />
               ))}
             </div>
           ) : (
@@ -201,45 +209,43 @@ const Projects = () => {
                     <motion.div
                       key={project.id}
                       layout
-                      initial={{ opacity: 0, y: 15 }}
+                      initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
                       transition={{ delay: i * 0.05 }}
                       onClick={() => setDescriptionTarget(project)}
                       className={cn(
-                        "group relative bg-card border border-border shadow-sm hover:shadow-xl hover:border-primary/20 rounded-2xl p-6 transition-all duration-300 cursor-pointer",
-                        descriptionTarget?.id === project.id && "ring-2 ring-primary/20 bg-primary/5"
+                        "group relative bg-white border border-border shadow-sm hover:shadow-md hover:border-[#4C9AFF] rounded-[3px] p-5 transition-all duration-200 cursor-pointer overflow-hidden flex flex-col h-full ring-offset-0",
+                        descriptionTarget?.id === project.id && "ring-2 ring-[#0052CC] ring-offset-0"
                       )}
                     >
-                      <div className="flex items-start justify-between mb-5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0 transition-transform group-hover:scale-110">
-                            <FolderKanban className="w-5 h-5" />
+                      <div className="flex-1 space-y-4">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-[3px] bg-[#0052CC] flex items-center justify-center text-white shrink-0 shadow-sm font-bold text-[18px]">
+                            {project.name.charAt(0).toUpperCase()}
                           </div>
                           <div className="min-w-0">
-                            <h3 className="font-bold text-base truncate pr-2">{project.name}</h3>
-                            <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                              <Building2 className="w-3.5 h-3.5" />
+                            <h3 className="font-bold text-[16px] text-[#172B4D] truncate group-hover:text-[#0052CC] transition-colors">{project.name}</h3>
+                            <p className="text-[12px] text-[#6B778C] flex items-center gap-1.5 mt-0.5 font-medium">
+                              <Building2 className="w-3 h-3" />
                               {project.client}
                             </p>
                           </div>
                         </div>
-                        {/* Dropdown removed per user request */}
+
+                        <p className="text-[14px] text-[#42526E] line-clamp-2 min-h-[2.5rem] leading-relaxed italic opacity-80">
+                          {project.description || "No description provided."}
+                        </p>
                       </div>
 
-                      <p className="text-sm text-muted-foreground mb-6 line-clamp-3 min-h-[3rem]">{project.description}</p>
-
-                      <div className="flex items-center justify-between pt-5 border-t border-border/50">
-                        <MemberBadges members={project.members} max={4} />
-                        <div className="flex flex-col items-end gap-0.5">
-                          <span className="text-[9px] font-black text-primary/40 tracking-wider">
-                            {project.projectCode}
-                          </span>
-                          <div className="flex items-center gap-1 text-xs font-bold text-foreground">
-                            <Users className="w-3.5 h-3.5 text-primary" />
-                            {project.members?.length || 0}
-                          </div>
+                      <div className="mt-5 pt-4 border-t border-border/60 flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5 text-[#6B778C]" />
+                          <span className="text-[12px] font-bold text-[#42526E]">{project.members?.length || 0}</span>
                         </div>
+                        <span className="text-[11px] font-bold text-[#6B778C] bg-[#F4F5F7] px-2 py-0.5 rounded-[2px] border border-border">
+                          {project.projectCode || "N/A"}
+                        </span>
                       </div>
                     </motion.div>
                   ))}
@@ -247,7 +253,14 @@ const Projects = () => {
               </div>
 
               <div className="mt-12 flex items-center justify-center">
-                <PaginationControls page={page} totalPages={pagination.totalPages} onPageChange={setPage} totalItems={pagination.totalItems} pageSize={PAGE_SIZE} />
+                <PaginationControls
+                  page={page}
+                  totalPages={pagination.totalPages}
+                  onPageChange={setPage}
+                  totalItems={pagination.totalItems}
+                  pageSize={PAGE_SIZE}
+                  className="rounded-[3px]"
+                />
               </div>
             </>
           )}
@@ -272,7 +285,7 @@ const Projects = () => {
           <AnimatePresence mode="popLayout">
             {descriptionTarget && (
               <ProjectDetailView
-                key={`detail-${descriptionTarget.id}`}
+                key={`detail - ${descriptionTarget.id} `}
                 project={descriptionTarget}
                 onClose={() => setDescriptionTarget(null)}
                 onEdit={(p) => openEdit(p)}
@@ -295,11 +308,12 @@ const Projects = () => {
                 errors={errors}
                 setErrors={setErrors}
                 isEditing={!!editingId}
+                isSaving={isSaving}
               />
             )}
           </AnimatePresence>
 
-          <DeleteDialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} itemName={deleteTarget?.name || "project"} />
+          <DeleteDialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} itemName={deleteTarget?.name || "project"} loading={isDeleting} />
         </div>
       </div>
     </AppLayout>

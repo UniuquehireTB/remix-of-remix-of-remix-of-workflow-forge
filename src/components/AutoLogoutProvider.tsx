@@ -3,11 +3,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { authService } from '@/services/authService';
 import { toast } from 'sonner';
 
-// Idle timeout set to 15 minutes
-const IDLE_TIMEOUT = 15 * 60 * 1000;
+// How long the user can be idle before being auto-logged out (30 minutes)
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 
-// Refresh token every 50 minutes (backend JWT expires in 1 hour)
-const REFRESH_INTERVAL = 50 * 60 * 1000;
+// How often to proactively refresh the token (every 50 min, token expires in 1h)
+const REFRESH_INTERVAL_MS = 50 * 60 * 1000;
+
+// How often we poll to check the above two conditions (every 30 seconds)
+const POLL_INTERVAL_MS = 30 * 1000;
 
 export const AutoLogoutProvider = ({ children }: { children: React.ReactNode }) => {
     const lastActivityRef = useRef(Date.now());
@@ -15,7 +18,7 @@ export const AutoLogoutProvider = ({ children }: { children: React.ReactNode }) 
     const navigate = useNavigate();
     const location = useLocation();
 
-    // Reset timers when the location changes (e.g. user logs in)
+    // Reset activity + refresh timestamps when user navigates to a protected page (e.g. after login)
     useEffect(() => {
         if (location.pathname !== '/login') {
             lastActivityRef.current = Date.now();
@@ -24,56 +27,57 @@ export const AutoLogoutProvider = ({ children }: { children: React.ReactNode }) 
     }, [location.pathname]);
 
     useEffect(() => {
-        // Do not set up listeners if we are on the login page
-        if (location.pathname === '/login') {
-            return;
-        }
+        if (location.pathname === '/login') return;
 
+        // ── Activity tracker ──────────────────────────────────────────────────
         const handleActivity = () => {
             lastActivityRef.current = Date.now();
         };
 
-        const events = ['mousemove', 'mousedown', 'keypress', 'touchmove', 'scroll'];
+        const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+        ACTIVITY_EVENTS.forEach(ev => window.addEventListener(ev, handleActivity, { passive: true }));
 
-        events.forEach(event => {
-            window.addEventListener(event, handleActivity, { passive: true });
-        });
+        // ── Proactive silent logout + token refresh ───────────────────────────
+        const doLogout = (message: string) => {
+            authService.logout();
+            toast.info(message);
+            navigate('/login', { replace: true });
+        };
 
-        const checkInterval = setInterval(() => {
-            // Re-check if user is still logged in according to storage
-            if (!authService.getCurrentUser()) {
-                clearInterval(checkInterval);
+        const poll = setInterval(async () => {
+            const user = authService.getCurrentUser();
+            if (!user) {
+                clearInterval(poll);
                 return;
             }
 
             const now = Date.now();
+            const idleMs = now - lastActivityRef.current;
+            const refreshAgeMs = now - lastRefreshRef.current;
 
-            // Check idle timeout
-            if (now - lastActivityRef.current > IDLE_TIMEOUT) {
-                authService.logout();
-                toast.info("Session expired due to inactivity. Please log in again.");
-                navigate('/login', { replace: true });
+            // ── Idle logout ───────────────────────────────────────────────────
+            if (idleMs > IDLE_TIMEOUT_MS) {
+                clearInterval(poll);
+                doLogout('You were logged out due to inactivity. Please log in again.');
+                return;
             }
 
-            // Refresh token if active and approaching expiration
-            if (now - lastRefreshRef.current > REFRESH_INTERVAL) {
-                authService.refresh().then(() => {
+            // ── Proactive token refresh (only if user is active) ──────────────
+            if (refreshAgeMs > REFRESH_INTERVAL_MS) {
+                try {
+                    await authService.refresh();
                     lastRefreshRef.current = Date.now();
-                }).catch(err => {
-                    console.error("Token refresh failed", err);
-                    authService.logout();
-                    toast.error("Session expired. Please log in again.");
-                    navigate('/login', { replace: true });
-                });
+                } catch {
+                    // If refresh fails, the session truly expired → logout
+                    clearInterval(poll);
+                    doLogout('Your session expired. Please log in again.');
+                }
             }
-
-        }, 30000); // Check every 30 seconds
+        }, POLL_INTERVAL_MS);
 
         return () => {
-            events.forEach(event => {
-                window.removeEventListener(event, handleActivity);
-            });
-            clearInterval(checkInterval);
+            ACTIVITY_EVENTS.forEach(ev => window.removeEventListener(ev, handleActivity));
+            clearInterval(poll);
         };
     }, [navigate, location.pathname]);
 

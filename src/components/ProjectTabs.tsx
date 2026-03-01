@@ -39,7 +39,9 @@ export function ProjectTabs({ projects, activeProjectId, onChange, scrolled }: P
                                     isActive ? "text-primary" : "text-slate-500 hover:text-foreground"
                                 )}
                             >
-                                {tab.name}
+                                <span className="max-w-[180px] truncate block">
+                                    {tab.name}
+                                </span>
                                 {isActive && (
                                     <motion.div
                                         layoutId="projectActiveTab"

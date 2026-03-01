@@ -7,12 +7,13 @@ interface AppLayoutProps {
   title: string;
   subtitle?: string;
   hideNav?: boolean;
+  hideLinks?: boolean;
 }
 
-export function AppLayout({ children, title, subtitle, hideNav = false, centerContent = false }: AppLayoutProps & { centerContent?: boolean }) {
+export function AppLayout({ children, title, subtitle, hideNav = false, hideLinks = false, centerContent = false }: AppLayoutProps & { centerContent?: boolean }) {
   return (
     <div className="h-screen flex flex-col w-full bg-background selection:bg-primary/10 overflow-hidden">
-      {!hideNav && <HeaderNav hideLinks={hideNav} />}
+      {!hideNav && <HeaderNav hideLinks={hideLinks} />}
       <main className={cn(
         "flex-1 flex flex-col min-h-0",
         !centerContent && "pt-16",

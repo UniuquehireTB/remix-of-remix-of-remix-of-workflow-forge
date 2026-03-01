@@ -6,78 +6,153 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
+    /* Radix/shadcn tokens */
+    --background: 220 14% 96%;
+    --foreground: 218 54% 20%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 218 54% 20%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 221 83% 53%;
+    --popover-foreground: 218 54% 20%;
+    --primary: 216 100% 40%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222 47% 11%;
+    --secondary: 218 25% 94%;
+    --secondary-foreground: 218 54% 20%;
+    --muted: 218 25% 94%;
+    --muted-foreground: 218 13% 48%;
+    --accent: 216 100% 95%;
+    --accent-foreground: 216 100% 40%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 221 83% 53%;
-    --radius: 0.75rem;
+    --border: 223 10% 89%;
+    --input: 223 10% 89%;
+    --ring: 216 100% 40%;
+    --radius: 3px;
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
     --info: 199 89% 48%;
     --info-foreground: 0 0% 100%;
-    --chart-1: 221 83% 53%;
+    --chart-1: 216 100% 40%;
     --chart-2: 142 71% 45%;
     --chart-3: 38 92% 50%;
     --chart-4: 280 67% 60%;
     --chart-5: 0 84% 60%;
-    --shadow-sm: 0 1px 2px 0 hsl(221 83% 53% / 0.03);
-    --shadow-md: 0 4px 6px -1px hsl(221 83% 53% / 0.06), 0 2px 4px -2px hsl(221 83% 53% / 0.04);
-    --shadow-lg: 0 10px 25px -5px hsl(221 83% 53% / 0.08), 0 4px 6px -4px hsl(221 83% 53% / 0.03);
-    --shadow-xl: 0 20px 50px -10px hsl(221 83% 53% / 0.12);
-    --shadow-glow: 0 0 30px hsl(221 83% 53% / 0.15);
-    --sidebar-background: 222 47% 6%;
-    --sidebar-foreground: 220 14% 75%;
-    --sidebar-primary: 221 83% 53%;
+    --shadow-sm: 0 1px 2px 0 rgba(9, 30, 66, 0.08);
+    --shadow-md: 0 4px 8px -2px rgba(9, 30, 66, 0.25), 0 0 1px rgba(9, 30, 66, 0.31);
+    --shadow-lg: 0 12px 24px -6px rgba(9, 30, 66, 0.25), 0 0 1px rgba(9, 30, 66, 0.31);
+    --shadow-xl: 0 20px 40px -10px rgba(9, 30, 66, 0.3);
+    --shadow-glow: 0 0 20px rgba(0, 82, 204, 0.1);
+    --sidebar-background: 218 54% 15%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 216 100% 40%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 222 30% 12%;
-    --sidebar-accent-foreground: 220 14% 90%;
-    --sidebar-border: 222 30% 14%;
-    --sidebar-ring: 221 83% 53%;
-    --sidebar-muted: 220 10% 46%;
+    --sidebar-accent: 218 54% 20%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 217 33% 25%;
+    --sidebar-ring: 216 100% 40%;
+    --sidebar-muted: 218 13% 48%;
+
+    /* ── Jira-specific design tokens (light) ─────────────────────────────── */
+    --jira-page-bg: #F4F5F7;
+    --jira-surface: #FFFFFF;
+    --jira-surface-raised: #FFFFFF;
+    --jira-surface-overlay: #FFFFFF;
+    --jira-border: #DFE1E6;
+    --jira-border-subtle: #EBECF0;
+
+    --jira-text-primary: #172B4D;
+    --jira-text-secondary: #42526E;
+    --jira-text-muted: #6B778C;
+    --jira-text-subtle: #97A0AF;
+
+    --jira-blue: #0052CC;
+    --jira-blue-hover: #0747A6;
+    --jira-blue-light: #DEEBFF;
+    --jira-blue-mid: #4C9AFF;
+
+    --jira-filter-bg: #F4F5F7;
+    --jira-filter-pill-bg: #EBECF0;
+    --jira-input-bg: #FAFBFC;
+
+    --jira-tag-todo-bg: #DFE1E6;
+    --jira-tag-todo-text: #42526E;
+    --jira-tag-progress-bg: #DEEBFF;
+    --jira-tag-progress-text: #0052CC;
+    --jira-tag-done-bg: #E3FCEF;
+    --jira-tag-done-text: #00875A;
+    --jira-tag-hold-bg: #FFFAE6;
+    --jira-tag-hold-text: #974F0C;
+    --jira-tag-closed-bg: #EAE6FF;
+    --jira-tag-closed-text: #5243AA;
+
+    --jira-dark-nav: #172B4D;
+    --jira-dark-nav-text: #FFFFFF;
   }
 
+  /* ── Dark Mode ────────────────────────────────────────────────────────── */
   .dark {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 96%;
-    --card: 222 47% 9%;
-    --card-foreground: 210 40% 96%;
-    --popover: 222 47% 9%;
-    --popover-foreground: 210 40% 96%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 6%;
-    --secondary: 215 28% 17%;
-    --secondary-foreground: 210 40% 96%;
-    --muted: 215 28% 14%;
+    /* Radix/shadcn tokens */
+    --background: 222 20% 10%;
+    --foreground: 214 32% 91%;
+    --card: 222 20% 14%;
+    --card-foreground: 214 32% 91%;
+    --popover: 222 20% 14%;
+    --popover-foreground: 214 32% 91%;
+    --primary: 216 100% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 222 20% 18%;
+    --secondary-foreground: 214 32% 91%;
+    --muted: 222 20% 17%;
     --muted-foreground: 215 16% 57%;
-    --accent: 215 28% 17%;
-    --accent-foreground: 210 40% 96%;
+    --accent: 222 20% 20%;
+    --accent-foreground: 214 32% 91%;
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 100%;
-    --border: 215 28% 17%;
-    --input: 215 28% 17%;
-    --ring: 217 91% 60%;
-    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.2);
-    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.3), 0 2px 4px -2px hsl(0 0% 0% / 0.2);
-    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.4), 0 4px 6px -4px hsl(0 0% 0% / 0.3);
-    --shadow-xl: 0 20px 50px -10px hsl(0 0% 0% / 0.5);
-    --shadow-glow: 0 0 30px hsl(217 91% 60% / 0.2);
+    --border: 222 16% 22%;
+    --input: 222 16% 22%;
+    --ring: 216 100% 55%;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+    --shadow-xl: 0 20px 50px -10px rgba(0, 0, 0, 0.6);
+    --shadow-glow: 0 0 30px rgba(76, 154, 255, 0.15);
+
+    /* ── Jira-specific design tokens (dark) ──────────────────────────────── */
+    --jira-page-bg: #0D1117;
+    --jira-surface: #161B22;
+    --jira-surface-raised: #1C2333;
+    --jira-surface-overlay: #1C2333;
+    --jira-border: #30363D;
+    --jira-border-subtle: #21262D;
+
+    --jira-text-primary: #E6EDF3;
+    --jira-text-secondary: #8B949E;
+    --jira-text-muted: #8B949E;
+    --jira-text-subtle: #6E7681;
+
+    --jira-blue: #4C9AFF;
+    --jira-blue-hover: #79B8FF;
+    --jira-blue-light: #1C3557;
+    --jira-blue-mid: #4C9AFF;
+
+    --jira-filter-bg: #161B22;
+    --jira-filter-pill-bg: #21262D;
+    --jira-input-bg: #0D1117;
+
+    --jira-tag-todo-bg: #30363D;
+    --jira-tag-todo-text: #8B949E;
+    --jira-tag-progress-bg: #1C3557;
+    --jira-tag-progress-text: #4C9AFF;
+    --jira-tag-done-bg: #1B3A2D;
+    --jira-tag-done-text: #3FB950;
+    --jira-tag-hold-bg: #3D2E0E;
+    --jira-tag-hold-text: #E3B341;
+    --jira-tag-closed-bg: #2A2157;
+    --jira-tag-closed-text: #B392F0;
+
+    --jira-dark-nav: #1C2333;
+    --jira-dark-nav-text: #E6EDF3;
   }
 }
 
@@ -88,7 +163,9 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
   }
 
   h1,
@@ -97,28 +174,230 @@
   h4,
   h5,
   h6 {
-    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-    @apply font-bold tracking-tight;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    @apply font-semibold tracking-tight;
+    color: var(--jira-text-primary);
+  }
+
+  h1 {
+    font-size: 24px;
+  }
+
+  h2 {
+    font-size: 20px;
+  }
+
+  h3 {
+    font-size: 16px;
   }
 
   code,
   pre {
     font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
   }
+}
+
+/* ── Global dark-mode overrides for hardcoded Jira colors ─────────────── */
+/* These rules fire on any element inside .dark, catching hardcoded values */
+
+.dark header {
+  background-color: var(--jira-surface) !important;
+  border-bottom-color: var(--jira-border) !important;
+}
+
+/* Page backgrounds */
+.dark [class*="bg-\[#F4F5F7\]"],
+.dark [class*="bg-\[#FAFBFC\]"] {
+  background-color: var(--jira-page-bg) !important;
+}
+
+/* White surfaces → dark surface */
+.dark [class*="bg-white"] {
+  background-color: var(--jira-surface) !important;
+}
+
+/* Borders */
+.dark [class*="border-\[#DFE1E6\]"],
+.dark [class*="border-\[#EBECF0\]"] {
+  border-color: var(--jira-border) !important;
+}
+
+/* Text colours */
+.dark [class*="text-\[#172B4D\]"] {
+  color: var(--jira-text-primary) !important;
+}
+
+.dark [class*="text-\[#42526E\]"] {
+  color: var(--jira-text-secondary) !important;
+}
+
+.dark [class*="text-\[#6B778C\]"] {
+  color: var(--jira-text-muted) !important;
+}
+
+.dark [class*="text-\[#97A0AF\]"] {
+  color: var(--jira-text-subtle) !important;
+}
+
+.dark [class*="text-\[#B3BAC5\]"] {
+  color: var(--jira-text-subtle) !important;
+}
+
+/* Primary blue - keep but adjust */
+.dark [class*="bg-\[#0052CC\]"] {
+  background-color: var(--jira-blue) !important;
+}
+
+.dark [class*="hover\:bg-\[#0052CC\]"]:hover {
+  background-color: var(--jira-blue) !important;
+}
+
+.dark [class*="bg-\[#0747A6\]"] {
+  background-color: var(--jira-blue-hover) !important;
+}
+
+.dark [class*="text-\[#0052CC\]"] {
+  color: var(--jira-blue) !important;
+}
+
+.dark [class*="border-\[#0052CC\]"] {
+  border-color: var(--jira-blue) !important;
+}
+
+.dark [class*="bg-\[#DEEBFF\]"] {
+  background-color: var(--jira-blue-light) !important;
+}
+
+/* Filter/pill backgrounds */
+.dark [class*="bg-\[#F4F5F7\]"] {
+  background-color: var(--jira-filter-bg) !important;
+}
+
+.dark [class*="bg-\[#EBECF0\]"] {
+  background-color: var(--jira-filter-pill-bg) !important;
+}
+
+.dark [class*="hover\:bg-\[#EBECF0\]"]:hover {
+  background-color: var(--jira-filter-pill-bg) !important;
+}
+
+.dark [class*="hover\:bg-\[#F4F5F7\]"]:hover {
+  background-color: var(--jira-filter-pill-bg) !important;
+}
+
+/* Dark nav strip color */
+.dark [class*="bg-\[#172B4D\]"] {
+  background-color: var(--jira-dark-nav) !important;
+}
+
+/* Status tag backgrounds */
+.dark [class*="bg-\[#DFE1E6\]"] {
+  background-color: var(--jira-tag-todo-bg) !important;
+}
+
+.dark [class*="bg-\[#E3FCEF\]"] {
+  background-color: var(--jira-tag-done-bg) !important;
+}
+
+.dark [class*="bg-\[#FFFAE6\]"] {
+  background-color: var(--jira-tag-hold-bg) !important;
+}
+
+.dark [class*="bg-\[#EAE6FF\]"] {
+  background-color: var(--jira-tag-closed-bg) !important;
+}
+
+.dark [class*="bg-\[#FFEBE6\]"] {
+  background-color: #3B1714 !important;
+}
+
+/* Status tag text */
+.dark [class*="text-\[#00875A\]"] {
+  color: var(--jira-tag-done-text) !important;
+}
+
+.dark [class*="text-\[#974F0C\]"] {
+  color: var(--jira-tag-hold-text) !important;
+}
+
+.dark [class*="text-\[#5243AA\]"] {
+  color: var(--jira-tag-closed-text) !important;
+}
+
+.dark [class*="text-\[#BF2600\]"] {
+  color: #F85149 !important;
+}
+
+.dark [class*="text-\[#DE350B\]"] {
+  color: #F85149 !important;
+}
+
+/* Sidebar / Drawers */
+.dark [class*="bg-\[#FAFBFC\]"] {
+  background-color: var(--jira-input-bg) !important;
+}
+
+/* Input fields */
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: var(--jira-input-bg) !important;
+  border-color: var(--jira-border) !important;
+  color: var(--jira-text-primary) !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: var(--jira-text-subtle) !important;
+}
+
+/* Cards and panels */
+.dark .premium-input {
+  background-color: var(--jira-input-bg) !important;
+  border-color: var(--jira-border) !important;
+  color: var(--jira-text-primary) !important;
+}
+
+.dark .premium-input::placeholder {
+  color: var(--jira-text-subtle) !important;
+}
+
+/* Scrollbar in dark mode */
+.dark ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--jira-border);
+  border-radius: 9999px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--jira-text-subtle);
+}
+
+/* ── Focus ring override for dark mode ────────────────────────────────── */
+.dark [class*="focus-within\:ring-\[#0052CC\]"]:focus-within {
+  --tw-ring-color: var(--jira-blue) !important;
+}
+
+.dark [class*="focus\:ring-\[#4C9AFF\]"]:focus {
+  --tw-ring-color: var(--jira-blue-mid) !important;
 }
 
 @layer utilities {
   .text-gradient {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, hsl(221, 83%, 53%), hsl(199, 89%, 48%));
+    background-image: linear-gradient(135deg, hsl(216, 100%, 40%), hsl(199, 89%, 48%));
   }
 
   .glass {
-    @apply bg-card/80 backdrop-blur-xl border border-border/50;
+    @apply bg-card/95 backdrop-blur-md border border-border/60;
   }
 
   .card-hover {
-    @apply transition-all duration-300 hover:shadow-lg hover:border-primary/20 hover:-translate-y-0.5;
+    @apply transition-all duration-200 hover:shadow-md hover:border-primary/30;
   }
 
   .animate-fade-in {
@@ -142,15 +421,16 @@
   }
 
   .premium-input {
-    @apply w-full px-3.5 py-2.5 border-2 border-input rounded-xl bg-background text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-muted-foreground/50;
+    @apply w-full px-3 py-2 border border-[#DFE1E6] rounded-[3px] bg-white text-[14px] font-medium transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-[#4C9AFF] focus:border-[#4C9AFF] placeholder:text-[#6B778C]/50;
+    color: #172B4D;
   }
 
   .premium-input-sm {
-    @apply w-full px-3 py-2 border-2 border-input rounded-xl bg-background text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-muted-foreground/50;
+    @apply w-full px-2 py-1 border border-[#DFE1E6] rounded-[2px] bg-white text-[13px] font-medium transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-[#4C9AFF] focus:border-[#4C9AFF] placeholder:text-[#6B778C]/50;
   }
 
   .premium-label {
-    @apply text-sm font-semibold text-foreground/80 capitalize mb-1.5 flex items-center gap-1.5;
+    @apply text-[11px] font-bold text-[#6B778C] mb-1.5 flex items-center gap-2;
   }
 
   .scrollbar-hide {
@@ -162,8 +442,27 @@
     display: none;
   }
 
+  .premium-scrollbar::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  .premium-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .premium-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 9999px;
+  }
+
+  .premium-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.4);
+  }
+
   .premium-select {
-    @apply w-full px-3.5 py-2.5 border-2 border-input rounded-xl bg-background text-sm font-medium transition-all duration-200 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary;
+    @apply w-full px-3 py-2 border border-[#DFE1E6] rounded-[3px] bg-white text-[14px] font-medium transition-all duration-200 appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#4C9AFF] focus:border-[#4C9AFF];
+    color: #172B4D;
   }
 }
 
