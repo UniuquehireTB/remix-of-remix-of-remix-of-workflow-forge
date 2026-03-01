@@ -357,20 +357,16 @@ const Notes = () => {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    const startTime = Date.now();
     setIsDeleting(true);
     try {
       await noteService.delete(deleteTarget.id);
-      fetchNotes();
+      setDeleteTarget(null);
       toast({ title: "Note Deleted", variant: "success" });
+      fetchNotes();
     } catch (err) {
       toast({ title: "Error", description: "Failed to delete note", variant: "destructive" });
     } finally {
-      const elapsed = Date.now() - startTime;
-      setTimeout(() => {
-        setIsDeleting(false);
-        setDeleteTarget(null);
-      }, Math.max(0, 1500 - elapsed));
+      setIsDeleting(false);
     }
   };
 
@@ -386,7 +382,7 @@ const Notes = () => {
 
   return (
     <AppLayout title="Notes" subtitle="Quick notes and checklists">
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-[#F4F5F7]">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-white">
         <div className="bg-white border-b border-border/60 z-20 shrink-0">
           <ProjectTabs
             projects={projects}
@@ -418,7 +414,7 @@ const Notes = () => {
                           "px-3 py-1.5 text-[13px] font-medium transition-all duration-200 rounded-[3px] whitespace-nowrap",
                           active
                             ? "bg-[#0052CC] text-white"
-                            : "text-[#42526E] hover:bg-[#EBECF0] hover:text-[#172B4D]"
+                            : "bg-[#F4F5F7] text-[#42526E] hover:bg-[#EBECF0] hover:text-[#172B4D]"
                         )}
                       >
                         {f.label}

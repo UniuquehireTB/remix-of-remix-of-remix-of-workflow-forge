@@ -46,16 +46,12 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    const startTime = Date.now();
     setLoading(true);
     try {
       await authService.login({ email, password });
-      const elapsed = Date.now() - startTime;
-      setTimeout(() => {
-        setLoading(false);
-        toast({ title: "Welcome back!", description: "You have signed in successfully.", variant: "success" });
-        navigate("/");
-      }, Math.max(0, 1500 - elapsed));
+      setLoading(false);
+      toast({ title: "Welcome back!", description: "You have signed in successfully.", variant: "success" });
+      navigate("/");
     } catch (error: any) {
       setLoading(false);
       toast({ title: "Login Failed", description: error.message || "Invalid email or password.", variant: "destructive" });

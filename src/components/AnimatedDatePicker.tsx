@@ -164,7 +164,7 @@ export function AnimatedDatePicker({
             >
               {showIcon && (icon || <CalendarIcon className="w-3.5 h-3.5 shrink-0 text-[#6B778C]" />)}
               {(selected || placeholder) && (
-                <span className={cn("truncate text-[#172B4D]", !selected && "text-[#6B778C]/60 italic font-normal")}>
+                <span className={cn("truncate text-[#172B4D]", !selected && "text-[#6B778C]/60 font-normal")}>
                   {selected ? format(selected, "MMM dd, yyyy") : placeholder}
                 </span>
               )}

@@ -47,7 +47,7 @@ export function ProjectDetailView({
 
     const createdDate = project.createdAt ? formatDistanceToNow(new Date(project.createdAt)) + " ago" : "—";
 
-    const formatCount = (count: number) => count.toString().padStart(2, '0');
+    const formatCount = (count: number) => count.toString();
 
     return (
         <motion.div

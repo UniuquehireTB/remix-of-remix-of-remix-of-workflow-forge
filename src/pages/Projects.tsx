@@ -149,22 +149,17 @@ const Projects = () => {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    const startTime = Date.now();
     setIsDeleting(true);
     try {
       await projectService.delete(deleteTarget.id);
+      setDeleteTarget(null);
       toast({ title: "Project Deleted", description: `${deleteTarget.name} has been removed.`, variant: "success" });
-
       fetchProjects();
       if (descriptionTarget?.id === deleteTarget.id) setDescriptionTarget(null);
     } catch (err) {
       toast({ title: "Error", description: "Failed to delete project", variant: "destructive" });
     } finally {
-      const elapsed = Date.now() - startTime;
-      setTimeout(() => {
-        setIsDeleting(false);
-        setDeleteTarget(null);
-      }, Math.max(0, 1500 - elapsed));
+      setIsDeleting(false);
     }
   };
 
