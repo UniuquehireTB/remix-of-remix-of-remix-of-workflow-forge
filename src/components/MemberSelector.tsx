@@ -118,13 +118,16 @@ export function MemberSelector({
         }));
     };
 
-    const hasAllTeamSelected = members.length > 1 && members.filter(m => String(m.id) !== String(currentUser?.id)).every(m => isMemberSelected(m.id));
-    const hasAnyTeamSelected = members.some(m => String(m.id) !== String(currentUser?.id) && isMemberSelected(m.id));
+    const eligibleTeamMembers = members.filter(m =>
+        String(m.id) !== String(currentUser?.id) &&
+        (!allowedMemberIds || allowedMemberIds.some(aid => String(aid) === String(m.id)))
+    );
+
+    const hasAllTeamSelected = eligibleTeamMembers.length > 0 && eligibleTeamMembers.every(m => isMemberSelected(m.id));
+    const hasAnyTeamSelected = eligibleTeamMembers.some(m => isMemberSelected(m.id));
 
     const toggleAllTeam = (e: React.MouseEvent) => {
         e.stopPropagation();
-        const teamMembers = members.filter(m => m.id !== currentUser?.id);
-        const teamIds = teamMembers.map(m => m.id);
 
         if (hasAllTeamSelected) {
             // Remove all team
@@ -134,7 +137,7 @@ export function MemberSelector({
             }));
         } else {
             // Add all team without default date
-            const newTeam = teamMembers.map(m => {
+            const newTeam = eligibleTeamMembers.map(m => {
                 const existing = selected.find(s => (typeof s === 'object' ? s.id : s) === m.id);
                 if (existing) return existing;
                 return isTickets ? { id: m.id, joinDate: "" } : m.id;
