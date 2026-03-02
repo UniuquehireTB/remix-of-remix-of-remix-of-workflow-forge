@@ -23,12 +23,19 @@ const Login = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Apply saved theme on login page
+  // Apply saved theme on login page and handle auto-redirect
   useEffect(() => {
     const saved = localStorage.getItem('theme');
     if (saved === 'dark') document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
-  }, []);
+
+    // If we have token + user, redirect to dashboard
+    const token = authService.getToken();
+    const user = authService.getCurrentUser();
+    if (token && user) {
+      navigate("/", { replace: true });
+    }
+  }, [navigate]);
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -170,13 +177,12 @@ const Login = () => {
                   onChange={e => { setEmail(e.target.value); setErrors(prev => ({ ...prev, email: "" })); }}
                   placeholder="you@company.com"
                   className={cn(
-                    "w-full pl-10 pr-3 h-10 text-[14px] rounded-[3px] border outline-none transition-all duration-150",
-                    "focus:ring-2 focus:ring-[#4C9AFF] focus:border-[#4C9AFF]",
-                    errors.email ? "border-red-500" : ""
+                    "w-full pl-10 pr-3 h-[40px] text-[14px] rounded-[3px] border outline-none transition-all duration-150",
+                    "focus:ring-2 focus:ring-[#4C9AFF]/20 focus:border-[#4C9AFF]",
+                    errors.email ? "border-red-500 shadow-[0_0_0_2px_rgba(239,68,68,0.1)]" : "border-[#A5ADBA]"
                   )}
                   style={{
                     background: 'var(--jira-surface)',
-                    borderColor: errors.email ? undefined : 'var(--jira-border)',
                     color: 'var(--jira-text-primary)',
                   }}
                 />
@@ -198,13 +204,12 @@ const Login = () => {
                   onChange={e => { setPassword(e.target.value); setErrors(prev => ({ ...prev, password: "" })); }}
                   placeholder="Enter your password"
                   className={cn(
-                    "w-full pl-10 pr-10 h-10 text-[14px] rounded-[3px] border outline-none transition-all duration-150",
-                    "focus:ring-2 focus:ring-[#4C9AFF] focus:border-[#4C9AFF]",
-                    errors.password ? "border-red-500" : ""
+                    "w-full pl-10 pr-10 h-[40px] text-[14px] rounded-[3px] border outline-none transition-all duration-150",
+                    "focus:ring-2 focus:ring-[#4C9AFF]/20 focus:border-[#4C9AFF]",
+                    errors.password ? "border-red-500 shadow-[0_0_0_2px_rgba(239,68,68,0.1)]" : "border-[#A5ADBA]"
                   )}
                   style={{
                     background: 'var(--jira-surface)',
-                    borderColor: errors.password ? undefined : 'var(--jira-border)',
                     color: 'var(--jira-text-primary)',
                   }}
                 />

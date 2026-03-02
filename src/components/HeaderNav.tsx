@@ -706,7 +706,7 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
                     <div className="relative">
                       <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B778C]" />
                       <input value={editMember.username} onChange={e => { setEditMember(p => ({ ...p, username: e.target.value })); setEditMemberErrors(p => ({ ...p, username: '' })); }}
-                        placeholder="Enter username" className={cn("premium-input !pl-12 !h-9 text-[13px]", editMemberErrors.username && "!border-destructive")} />
+                        placeholder="Enter username" className={cn("premium-input !pl-12 !h-[40px] text-[13px] border-[#A5ADBA]", editMemberErrors.username && "!border-destructive")} />
                     </div>
                     {editMemberErrors.username && <p className="text-[10px] text-destructive font-bold">{editMemberErrors.username}</p>}
                   </div>
@@ -716,7 +716,7 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
                     <div className="relative">
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B778C]" />
                       <input type="email" value={editMember.email} onChange={e => { setEditMember(p => ({ ...p, email: e.target.value })); setEditMemberErrors(p => ({ ...p, email: '' })); }}
-                        placeholder="user@company.com" className={cn("premium-input !pl-12 !h-9 text-[13px]", editMemberErrors.email && "!border-destructive")} />
+                        placeholder="user@company.com" className={cn("premium-input !pl-12 !h-[40px] text-[13px] border-[#A5ADBA]", editMemberErrors.email && "!border-destructive")} />
                     </div>
                     {editMemberErrors.email && <p className="text-[10px] text-destructive font-bold">{editMemberErrors.email}</p>}
                   </div>
@@ -725,7 +725,7 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
                     <label className="text-[12px] font-bold text-[#42526E] flex items-center gap-2"><Shield className="w-3.5 h-3.5 text-[#0052CC]" />Role <span className="text-destructive">*</span></label>
                     <AnimatedDropdown options={roles.map(r => ({ label: r, value: r }))} value={editMember.role}
                       onChange={v => { setEditMember(p => ({ ...p, role: v })); setEditMemberErrors(p => ({ ...p, role: '' })); }}
-                      placeholder="Select role" error={!!editMemberErrors.role} triggerClassName="!h-9 border-[#DFE1E6] text-[13px]" />
+                      placeholder="Select role" error={!!editMemberErrors.role} triggerClassName="!h-[40px] border-[#A5ADBA] text-[13px]" />
                     {editMemberErrors.role && <p className="text-[10px] text-destructive font-bold">{editMemberErrors.role}</p>}
                   </div>
 
@@ -807,7 +807,7 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B778C]" />
                     <input value={signupName} onChange={e => { setSignupName(e.target.value); setSignupErrors(p => ({ ...p, name: "" })); }}
                       placeholder="Enter full name"
-                      className={cn("premium-input !pl-12 !h-9 text-[13px]", signupErrors.name && "!border-destructive focus:ring-destructive/20")} />
+                      className={cn("premium-input !pl-12 !h-[40px] text-[13px] border-[#A5ADBA]", signupErrors.name && "!border-destructive focus:ring-destructive/20")} />
                   </div>
                   {signupErrors.name && <p className="text-[10px] text-destructive font-bold">{signupErrors.name}</p>}
                 </div>
@@ -819,7 +819,7 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
                     <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B778C]" />
                     <input type="email" value={signupEmail} onChange={e => { setSignupEmail(e.target.value); setSignupErrors(p => ({ ...p, email: "" })); }}
                       placeholder="user@company.com"
-                      className={cn("premium-input !pl-12 !h-9 text-[13px]", signupErrors.email && "!border-destructive focus:ring-destructive/20")} />
+                      className={cn("premium-input !pl-12 !h-[40px] text-[13px] border-[#A5ADBA]", signupErrors.email && "!border-destructive focus:ring-destructive/20")} />
                   </div>
                   {signupErrors.email && <p className="text-[11px] text-destructive font-bold">{signupErrors.email}</p>}
                 </div>
@@ -835,7 +835,7 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
                     onChange={v => { setSignupRole(v); setSignupErrors(p => ({ ...p, role: "" })); }}
                     placeholder="Select role"
                     error={!!signupErrors.role}
-                    triggerClassName="!h-9 border-[#DFE1E6] text-[13px]"
+                    triggerClassName="!h-[40px] border-[#A5ADBA] text-[13px]"
                   />
                   {signupErrors.role && <p className="text-[11px] text-destructive font-bold">{signupErrors.role}</p>}
                 </div>
@@ -848,7 +848,7 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#6B778C]" />
                       <input type={showPass ? "text" : "password"} value={signupPassword} onChange={e => { setSignupPassword(e.target.value); setSignupErrors(p => ({ ...p, password: "" })); }}
                         placeholder="Min 6 chars"
-                        className={cn("premium-input !pl-9 pr-8 !h-9 text-[13px]", signupErrors.password && "!border-destructive focus:ring-destructive/20")} />
+                        className={cn("premium-input !pl-9 pr-8 !h-[40px] text-[13px] border-[#A5ADBA]", signupErrors.password && "!border-destructive focus:ring-destructive/20")} />
                       <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#6B778C] hover:text-[#172B4D]">
                         {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                       </button>
@@ -862,7 +862,7 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#6B778C]" />
                       <input type={showConf ? "text" : "password"} value={signupConfirm} onChange={e => { setSignupConfirm(e.target.value); setSignupErrors(p => ({ ...p, confirm: "" })); }}
                         placeholder="Re-enter"
-                        className={cn("premium-input !pl-9 pr-8 !h-9 text-[13px]", signupErrors.confirm && "!border-destructive focus:ring-destructive/20")} />
+                        className={cn("premium-input !pl-9 pr-8 !h-[40px] text-[13px] border-[#A5ADBA]", signupErrors.confirm && "!border-destructive focus:ring-destructive/20")} />
                       <button type="button" onClick={() => setShowConf(!showConf)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#6B778C] hover:text-[#172B4D]">
                         {showConf ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                       </button>

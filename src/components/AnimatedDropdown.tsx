@@ -76,32 +76,31 @@ export function AnimatedDropdown({
         disabled={disabled}
         onClick={handleOpen}
         className={cn(
-          "w-full flex items-center justify-between gap-2 border rounded-[3px] bg-white text-[14px] font-medium transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-[#4C9AFF] focus:border-[#4C9AFF] cursor-pointer",
-          size === "sm" ? "px-3 py-1.5 text-[12px]" : "px-3 py-2",
-          error ? "!border-[#DE350B] focus:ring-[#DE350B]" : "border-[#DFE1E6]",
-          open && "ring-1 ring-[#4C9AFF] border-[#4C9AFF]",
+          "w-full flex items-center justify-between gap-2 border rounded-[3px] bg-white text-[14px] font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#4C9AFF]/20 focus:border-[#4C9AFF] cursor-pointer",
+          size === "sm" ? "px-3 h-[34px] text-[12px]" : "px-3 h-[40px]",
+          error ? "!border-[#DE350B] focus:ring-[#DE350B]/10" : "border-[#A5ADBA] hover:bg-[#F4F5F7]",
+          open && "ring-2 ring-[#4C9AFF]/20 border-[#4C9AFF] bg-white hover:bg-white",
           disabled && "opacity-50 cursor-not-allowed bg-[#F4F5F7]",
           triggerClassName
         )}
       >
-        <span className={cn("flex-1 text-left min-w-0 truncate text-[#172B4D]", !selected && "text-[#6B778C]/60")}>
+        <span className={cn("flex-1 text-left min-w-0 truncate text-[#172B4D] font-medium", !selected && "text-[#6B778C]/70")}>
           {selected ? (
             <span className="flex items-center gap-2 truncate">
-              {selected.icon && <span className="shrink-0 scale-90">{selected.icon}</span>}
+              {selected.icon && <span className="shrink-0">{selected.icon}</span>}
               <span className="truncate">{selected.label}</span>
             </span>
           ) : (
-            placeholder
+            <span className="opacity-60">{placeholder}</span>
           )}
         </span>
-        <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }}>
-          <ChevronDown
-            className={cn(
-              "w-4 h-4 text-[#6B778C]",
-              size === "sm" && "w-3.5 h-3.5"
-            )}
-          />
-        </motion.div>
+        <ChevronDown
+          className={cn(
+            "w-4 h-4 text-[#44546F] transition-transform duration-200 shrink-0",
+            open && "rotate-180",
+            size === "sm" && "w-3.5 h-3.5"
+          )}
+        />
       </button>
 
       {/* Dropdown menu — absolute below (or above) the trigger */}

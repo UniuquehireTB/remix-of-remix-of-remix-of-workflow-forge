@@ -44,6 +44,7 @@ interface AnimatedDatePickerProps {
   maxDate?: string;
   showIcon?: boolean;
   icon?: React.ReactNode;
+  clearable?: boolean;
 }
 
 export function AnimatedDatePicker({
@@ -59,6 +60,7 @@ export function AnimatedDatePicker({
   maxDate,
   showIcon = true,
   icon,
+  clearable = false,
 }: AnimatedDatePickerProps) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<View>("day");
@@ -113,6 +115,12 @@ export function AnimatedDatePicker({
     setView("day");
   };
 
+  const handleClear = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange("");
+    setOpen(false);
+  };
+
   const selectMonth = (monthIdx: number) => {
     setCurrentMonth((prev) => setMonth(prev, monthIdx));
     setView("day");
@@ -138,13 +146,14 @@ export function AnimatedDatePicker({
 
   return (
     <DialogPrimitive.Root open={open && !disabled} onOpenChange={setOpen}>
-      <div className={cn("relative", className, disabled && "opacity-60")}>
+      <div className={cn("relative group/picker", className, disabled && "opacity-60")}>
         <DialogPrimitive.Trigger asChild disabled={disabled}>
           {children ? (
             <div className={cn(
               "focus:outline-none",
               disabled ? "cursor-not-allowed pointer-events-none" : "cursor-pointer",
-              triggerClassName
+              triggerClassName,
+              clearable && selected && "pr-7"
             )}>
               {children}
             </div>
@@ -153,24 +162,34 @@ export function AnimatedDatePicker({
               type="button"
               disabled={disabled}
               className={cn(
-                "w-full flex items-center border rounded-[3px] bg-[#FAFBFC] px-3 py-2 text-[14px] font-medium transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-[#4C9AFF] focus:border-[#4C9AFF] focus:bg-white",
+                "w-full flex items-center border rounded-[3px] bg-white px-3 h-[40px] text-[14px] font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#4C9AFF]/20 focus:border-[#4C9AFF]",
                 (selected || placeholder) && "gap-2",
-                error ? "!border-[#DE350B] focus:ring-[#DE350B]" : "border-[#DFE1E6]",
-                open && "ring-1 ring-[#4C9AFF] border-[#4C9AFF] bg-white",
-                selected && "pr-8",
-                disabled ? "bg-[#F4F5F7] cursor-not-allowed border-none" : "hover:bg-[#EBECF0]",
+                error ? "!border-[#DE350B] focus:ring-[#DE350B]/10" : "border-[#A5ADBA] hover:bg-[#F4F5F7]",
+                open && "ring-2 ring-[#4C9AFF]/20 border-[#4C9AFF] bg-white",
+                selected && (clearable ? "pr-10" : "pr-8"),
+                disabled ? "bg-[#F4F5F7] cursor-not-allowed border-none opacity-50" : "",
                 triggerClassName
               )}
             >
               {showIcon && (icon || <CalendarIcon className="w-3.5 h-3.5 shrink-0 text-[#6B778C]" />)}
               {(selected || placeholder) && (
                 <span className={cn("truncate text-[#172B4D]", !selected && "text-[#6B778C]/60 font-normal")}>
-                  {selected ? format(selected, "MMM dd, yyyy") : placeholder}
+                  {selected && !isNaN(selected.getTime()) ? format(selected, "MMM dd, yyyy") : placeholder}
                 </span>
               )}
             </button>
           )}
         </DialogPrimitive.Trigger>
+
+        {clearable && selected && !isNaN(selected.getTime()) && !disabled && (
+          <button
+            type="button"
+            onClick={handleClear}
+            className="absolute right-1 top-1/2 -translate-y-1/2 w-5 h-5 rounded-[2px] flex items-center justify-center text-[#6B778C] hover:bg-[#EBECF0] hover:text-[#172B4D] transition-all opacity-0 group-hover/picker:opacity-100 z-10"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       <DialogPrimitive.Portal>

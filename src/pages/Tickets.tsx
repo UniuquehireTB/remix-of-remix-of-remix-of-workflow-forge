@@ -25,7 +25,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ProjectTabs } from "@/components/ProjectTabs";
 import { ticketService, projectService, authService } from "@/services/authService";
 import { TicketDetailView } from "@/components/TicketDetailView";
-import { TicketSidebarForm } from "@/components/TicketSidebarForm";
+import { useTicketDraft } from "@/hooks/useTicketDraft";
 import React from "react";
 
 const PAGE_SIZE = 10;
@@ -77,7 +77,13 @@ const Tickets = () => {
   const [priorityFilter, setPriorityFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [projectFilter, setProjectFilter] = useState<any>("All");
-  const [viewMode, setViewMode] = useState<'table' | 'board'>('board');
+  const [viewMode, setViewMode] = useState<'table' | 'board'>(() => {
+    return (localStorage.getItem('ticketViewMode') as 'table' | 'board') || 'board';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('ticketViewMode', viewMode);
+  }, [viewMode]);
   // Privileged roles see all members' tickets by default; others see only their own
   const [employeeFilter, setEmployeeFilter] = useState<any>(
     isPrivileged ? "All" : (currentUser?.id?.toString() ?? "All")
@@ -103,19 +109,27 @@ const Tickets = () => {
     { 'Open': false, 'In Progress': false, 'On Hold': false, 'Closed': false }
   );
 
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Ticket | null>(null);
   const [closeTarget, setCloseTarget] = useState<Ticket | null>(null);
   const [manualCloseDate, setManualCloseDate] = useState(new Date().toISOString().split('T')[0]);
-  const [editData, setEditData] = useState<Partial<Ticket>>(emptyTicket());
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [descriptionTarget, setDescriptionTarget] = useState<Ticket | null>(null);
   const [showFullDesc, setShowFullDesc] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+  const {
+    openCreate: globalOpenCreate,
+    openEdit: globalOpenEdit,
+    handleSave: globalHandleSave,
+    isOpen: isGlobalFormOpen,
+    editingId,
+    editData,
+    refreshTrigger,
+    setRefreshTrigger
+  } = useTicketDraft();
+
   const { toast } = useToast();
 
   useEffect(() => {
@@ -166,10 +180,11 @@ const Tickets = () => {
   };
 
   // Fetch all 4 columns fresh (reset to page 1)
-  const fetchBoard = () => {
+  const fetchBoard = async () => {
     const resetPages = { 'Open': 1, 'In Progress': 1, 'On Hold': 1, 'Closed': 1 };
     setBoardPage(resetPages);
-    boardStatuses.forEach(col => fetchBoardColumn(col, 1, false));
+    // Explicitly await all column fetches
+    await Promise.all(boardStatuses.map(col => fetchBoardColumn(col, 1, false)));
   };
 
   const fetchTickets = async () => {
@@ -241,7 +256,21 @@ const Tickets = () => {
       }
     }
     fetchStats();
-  }, [projectFilter, tickets.length]); // Also refresh stats if tickets list changes (count wise)
+  }, [projectFilter, tickets.length, refreshTrigger]); // Also refresh stats if tickets list changes or refresh is triggered
+
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+      if (viewMode === 'board') {
+        fetchBoard();
+      } else {
+        fetchTickets();
+      }
+
+      if (descriptionTarget?.id) {
+        ticketService.getById(descriptionTarget.id).then(t => setDescriptionTarget(t)).catch(console.error);
+      }
+    }
+  }, [refreshTrigger, viewMode]);
 
   useEffect(() => {
     fetchProjects();
@@ -264,186 +293,17 @@ const Tickets = () => {
     }
   }, [searchParams]);
 
-  // Instant reactive validation for dates
-  useEffect(() => {
-    if (!dialogOpen) return;
-
-    setErrors(prev => {
-      const e = { ...prev };
-      let changed = false;
-
-      const hasAssigneeWithDate = editData.assignees?.some(a =>
-        typeof a === 'object' && a.joinDate && a.joinDate !== ""
-      );
-
-      // Validate Required End Date
-      if ((editData.startDate || hasAssigneeWithDate) && !editData.endDate) {
-        if (e.endDate !== "End date is required if any dates are assigned") {
-          e.endDate = "End date is required if any dates are assigned";
-          changed = true;
-        }
-      } else {
-        if (e.endDate === "End date is required if any dates are assigned") {
-          delete e.endDate;
-          changed = true;
-        }
-
-        // Validate range if both exist
-        const dateError = (editData.startDate && editData.endDate && new Date(editData.endDate) < new Date(editData.startDate))
-          ? "End date cannot be earlier than start date"
-          : "";
-
-        if (e.endDate !== dateError && (dateError || e.endDate === "End date cannot be earlier than start date")) {
-          if (dateError) e.endDate = dateError;
-          else delete e.endDate;
-          changed = true;
-        }
-      }
-
-      // Validate Assignee Join Dates
-      let assigneeErr = "";
-      if (editData.assignees && Array.isArray(editData.assignees)) {
-        for (const a of editData.assignees) {
-          if (typeof a === 'object' && a.joinDate) {
-            const joinDate = new Date(a.joinDate);
-            if (editData.endDate && joinDate > new Date(editData.endDate)) {
-              assigneeErr = "Assignee join date cannot be later than ticket end date";
-              break;
-            }
-            if (editData.startDate && joinDate < new Date(editData.startDate)) {
-              assigneeErr = "Assignee join date cannot be earlier than ticket start date";
-              break;
-            }
-          }
-        }
-      }
-
-      if (e.assignees !== assigneeErr && (assigneeErr || e.assignees?.includes("Assignee join date"))) {
-        if (assigneeErr) e.assignees = assigneeErr;
-        else delete e.assignees;
-        changed = true;
-      }
-
-      return changed ? e : prev;
-    });
-  }, [editData.startDate, editData.endDate, editData.assignees, dialogOpen]);
-
   const openCreate = () => {
-    setEditData({
-      ...emptyTicket(),
+    globalOpenCreate({
       projectId: (projectFilter === "All" || projectFilter === "General") ? null : projectFilter,
-      extendReason: ""
     });
-    setEditingId(null);
-    setErrors({});
-    setDialogOpen(true);
   };
 
   const openEdit = (t: Ticket) => {
-    setEditData({
-      ...t,
-      assignees: t.assignees?.map(a => ({
-        id: a.id,
-        joinDate: a.TicketAssignee?.joinDate || ""
-      })),
-      extendReason: ""
-    });
-    setEditingId(t.id);
-    setErrors({});
-    setDialogOpen(true);
+    globalOpenEdit(t);
   };
 
-  const handleSave = async () => {
-    // Validate in order — stop at first error
-    const showErr = (field: string, msg: string, toastMsg: string) => {
-      setErrors({ [field]: msg });
-      toast({ title: "Validation Error", description: toastMsg, variant: "destructive" });
-    };
 
-    if (!editData.title?.trim()) {
-      showErr("title", "Title is required", "Please enter a ticket title.");
-      return;
-    }
-    if (!editData.description?.trim()) {
-      showErr("description", "Description is required", "Please enter a description.");
-      return;
-    }
-    if (!editData.type) {
-      showErr("type", "Type is required", "Please select a ticket type.");
-      return;
-    }
-    if (!editData.priority) {
-      showErr("priority", "Priority is required", "Please select a priority level.");
-      return;
-    }
-
-    const hasAssigneeWithDate = editData.assignees?.some((a: any) =>
-      typeof a === 'object' && a.joinDate && a.joinDate !== ""
-    );
-
-    if ((editData.startDate || hasAssigneeWithDate) && !editData.endDate) {
-      showErr("endDate", "Due date is required if any dates are assigned", "Due date is required when a start date or assignee join date is set.");
-      return;
-    }
-
-    if (editData.startDate && editData.endDate && new Date(editData.endDate) < new Date(editData.startDate)) {
-      showErr("endDate", "Due date cannot be earlier than start date", "Due date cannot be earlier than the start date.");
-      return;
-    }
-
-    if (editData.assignees && Array.isArray(editData.assignees)) {
-      for (const a of editData.assignees) {
-        if (typeof a === 'object' && a.joinDate) {
-          const joinDate = new Date(a.joinDate);
-          if (editData.endDate && joinDate > new Date(editData.endDate)) {
-            showErr("assignees", "Assignee join date cannot be later than ticket due date", "An assignee's join date is after the ticket due date.");
-            return;
-          }
-          if (editData.startDate && joinDate < new Date(editData.startDate)) {
-            showErr("assignees", "Assignee join date cannot be earlier than ticket start date", "An assignee's join date is before the ticket start date.");
-            return;
-          }
-        }
-      }
-    }
-
-    // All valid — clear errors and save
-    setErrors({});
-    const startTime = Date.now();
-    setIsSaving(true);
-
-    try {
-      const payload = {
-        title: editData.title,
-        description: editData.description,
-        type: editData.type,
-        priority: editData.priority,
-        projectId: editData.projectId,
-        startDate: editData.startDate || null,
-        endDate: editData.endDate || null,
-        assignees: editData.assignees?.map(a => {
-          const userId = typeof a === 'object' ? a.id : a;
-          const joinDate = (typeof a === 'object' && a.joinDate) ? a.joinDate || null : null;
-          return { id: userId, joinDate };
-        })
-      };
-
-      if (editingId) {
-        await ticketService.update(editingId, payload);
-        toast({ title: "Ticket Updated", description: `${editData.title} has been updated.`, variant: "success" });
-      } else {
-        await ticketService.create(payload);
-        toast({ title: "Ticket Created", description: `${editData.title} has been created.`, variant: "success" });
-      }
-      fetchTickets();
-      setDialogOpen(false);
-    } catch (err) {
-      toast({ title: "Error", description: "Failed to save ticket", variant: "destructive" });
-    } finally {
-      const elapsed = Date.now() - startTime;
-      setTimeout(() => setIsSaving(false), Math.max(0, 1500 - elapsed));
-    }
-  };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -482,6 +342,7 @@ const Tickets = () => {
       }
 
       toast({ title: "Status Changed", description: `Ticket moved to ${newStatus}`, variant: "success" });
+      setRefreshTrigger(prev => prev + 1); // Trigger global refresh for board and detail views
     } catch (err) {
       toast({ title: "Error", description: "Failed to update status", variant: "destructive" });
     } finally {
@@ -510,6 +371,7 @@ const Tickets = () => {
 
 
       toast({ title: "Ticket Closed", description: `Closed date: ${manualCloseDate}`, variant: "success" });
+      setRefreshTrigger(prev => prev + 1); // Trigger global refresh for board and detail views
     } catch (err) {
       toast({ title: "Error", description: "Failed to close ticket", variant: "destructive" });
     } finally {
@@ -529,6 +391,7 @@ const Tickets = () => {
         setDescriptionTarget(response.ticket);
       }
       toast({ title: "✅ Due Date Extended", description: `New due date: ${endDate}` });
+      setRefreshTrigger(prev => prev + 1); // Update board/stats if needed
     } catch (err) {
       toast({ title: "❌ Error", description: "Failed to extend due date", variant: "destructive" });
     }
@@ -580,16 +443,20 @@ const Tickets = () => {
                           key={s}
                           onClick={() => { setStatusFilter(s); setPage(1); }}
                           className={cn(
-                            "px-3 py-1.5 text-[13px] font-medium transition-all duration-200 rounded-[3px] whitespace-nowrap flex items-center gap-2",
+                            "h-8 flex items-center transition-all duration-200 rounded-[3px] whitespace-nowrap overflow-hidden border-none shrink-0",
                             active
                               ? "bg-[#0052CC] text-white"
                               : "bg-[#F4F5F7] text-[#42526E] hover:bg-[#EBECF0] hover:text-[#172B4D]"
                           )}
                         >
-                          <span>{s}</span>
+                          <span className="px-3 h-full flex items-center text-[13px] font-medium">
+                            {s}
+                          </span>
                           <span className={cn(
-                            "px-1.5 py-0.5 rounded-full text-[11px] font-bold leading-none",
-                            active ? "bg-white/20 text-white" : "bg-[#DFE1E6] text-[#42526E]"
+                            "h-full flex items-center justify-center px-2.5 text-[11px] font-bold min-w-[28px]",
+                            active
+                              ? "bg-white/20 text-white"
+                              : "bg-[#DFE1E6] text-[#42526E]"
                           )}>
                             {s === 'All' ? stats?.total || 0 : stats?.[s] || 0}
                           </span>
@@ -641,7 +508,7 @@ const Tickets = () => {
                             <LayoutList className="w-3.5 h-3.5" />
                           </button>
                         </TooltipTrigger>
-                        <TooltipContent side="bottom" className="text-[12px] py-1 px-2">Table view</TooltipContent>
+                        <TooltipContent side="bottom" className="text-xs bg-[#172B4D] text-white border-none py-1.5 px-2">Table view</TooltipContent>
                       </Tooltip>
 
                       <div className="w-px h-4 bg-border/60" />
@@ -658,7 +525,7 @@ const Tickets = () => {
                             <Columns className="w-3.5 h-3.5" />
                           </button>
                         </TooltipTrigger>
-                        <TooltipContent side="bottom" className="text-[12px] py-1 px-2">Board view</TooltipContent>
+                        <TooltipContent side="bottom" className="text-xs bg-[#172B4D] text-white border-none py-1.5 px-2">Board view</TooltipContent>
                       </Tooltip>
                     </div>
                   </TooltipProvider>
@@ -744,8 +611,10 @@ const Tickets = () => {
             {viewMode === 'board' ? (
               /* ── BOARD VIEW ─────────────────────────────────────── */
               <div className="overflow-x-auto pb-4">
-                <div className="flex gap-3 min-w-[900px]">
-                  {(['Open', 'In Progress', 'On Hold', 'Closed'] as const).map((col) => {
+                <div className="flex gap-4 min-w-[900px] mb-8">
+                  {((['Open', 'In Progress', 'On Hold', 'Closed'] as const)
+                    .filter(col => statusFilter === "All" || col === statusFilter)
+                  ).map((col) => {
                     const colTickets = boardTickets[col];
                     const dotColor: Record<string, string> = {
                       'Open': '#97A0AF',
@@ -754,28 +623,28 @@ const Tickets = () => {
                       'Closed': '#00875A',
                     };
                     return (
-                      <div key={col} className="flex-1 flex flex-col min-w-[220px]">
+                      <div key={col} className="flex-1 flex flex-col min-w-[280px] bg-[#F4F5F7] rounded-[3px] min-h-[500px]">
                         {/* Column header — uniform neutral */}
-                        <div className="flex items-center justify-between px-3 py-3 rounded-t-[3px] bg-[#F4F5F7]">
+                        <div className="flex items-center justify-between px-3 py-3 shrink-0">
                           <div className="flex items-center gap-2">
                             {col === 'Open' && <Square className="w-3.5 h-3.5 text-[#5E6C84]" />}
                             {col === 'In Progress' && <RefreshCw className="w-3.5 h-3.5 text-[#0052CC]" />}
                             {col === 'On Hold' && <MinusCircle className="w-3.5 h-3.5 text-[#DE350B]" />}
                             {col === 'Closed' && <CheckCircle2 className="w-3.5 h-3.5 text-[#00875A]" />}
-                            <span className="text-[12px] font-semibold text-[#5E6C84] uppercase tracking-wide">
+                            <span className="text-[12px] font-bold text-[#5E6C84] uppercase tracking-wide">
                               {col}
                             </span>
                           </div>
 
                           <div className="flex items-center gap-2">
-                            <span className="text-[12px] text-[#5E6C84]">
+                            <span className="text-[12px] font-bold text-[#5E6C84] bg-[#DFE1E6] px-1.5 py-0.5 rounded-[2px]">
                               {colTickets.length}{boardHasMore[col] ? '+' : ''}
                             </span>
                           </div>
                         </div>
 
-                        {/* Cards */}
-                        <div className="flex flex-col gap-2 bg-[#F4F5F7] rounded-b-[3px] px-2 pb-2 flex-1 min-h-[120px]">
+                        {/* Cards container */}
+                        <div className="flex flex-col gap-2 px-2 pb-3 flex-1 overflow-y-auto premium-scrollbar">
                           {boardLoading[col] && colTickets.length === 0 ? (
                             Array(3).fill(0).map((_, i) => (
                               <div key={i} className="bg-white rounded-[3px] p-3 animate-pulse border border-border/40">
@@ -797,7 +666,7 @@ const Tickets = () => {
                                   animate={{ opacity: 1, y: 0 }}
                                   transition={{ delay: i * 0.02 }}
                                   onClick={() => setDescriptionTarget(t)}
-                                  className="bg-white rounded-[3px] p-3 border border-[#DFE1E6] hover:border-[#0052CC] cursor-pointer transition-all flex flex-col min-h-[100px]"
+                                  className="bg-white rounded-[3px] p-3 border-b border-transparent hover:border-[#0052CC] cursor-pointer transition-all flex flex-col min-h-[100px]"
                                 >
 
                                   {/* Top Row: Ticket ID + Type Tag */}
@@ -846,15 +715,51 @@ const Tickets = () => {
                                         </span>
                                       )}
 
-                                      <div className="flex -space-x-1">
-                                        {(t.assignees || []).slice(0, 1).map((a: any, idx: number) => (
-                                          <div key={idx}
-                                            className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white shadow-sm"
-                                            style={{ background: '#0052CC', color: '#fff' }}
-                                          >
-                                            {a.username.slice(0, 1).toUpperCase()}
-                                          </div>
+                                      <div className="flex -space-x-1.5 items-center">
+                                        {(t.assignees || []).slice(0, 3).map((a: any, idx: number) => (
+                                          <TooltipProvider key={idx} delayDuration={0}>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <div
+                                                  className="relative w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white shadow-sm cursor-help hover:-translate-y-0.5 transition-all"
+                                                  style={{ background: '#0052CC', color: '#fff' }}
+                                                >
+                                                  {a.username.slice(0, 1).toUpperCase()}
+                                                  {a.TicketAssignee?.startDate && (
+                                                    <div className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-white rounded-full flex items-center justify-center shadow-md z-10 border border-[#EBECF0]">
+                                                      <Calendar className="w-2 h-2 text-[#0052CC]" />
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              </TooltipTrigger>
+                                              <TooltipContent side="top" className="bg-[#172B4D] text-white border-none py-1.5 px-2.5 rounded-[4px] shadow-xl mb-1 min-w-[140px]">
+                                                <div className="space-y-1.5">
+                                                  <p className="font-bold text-[11px] border-b border-white/10 pb-1">{a.username}</p>
+                                                  {(a.TicketAssignee?.startDate) ? (
+                                                    <div className="pt-0.5">
+                                                      <div className="flex flex-col">
+                                                        <span className="text-[8px] font-bold text-white/50 uppercase">Start Date</span>
+                                                        <span className="text-[10px] font-medium text-white">
+                                                          {(() => {
+                                                            const d = new Date(a.TicketAssignee.startDate);
+                                                            return !isNaN(d.getTime()) ? format(d, "MMM d") : "—";
+                                                          })()}
+                                                        </span>
+                                                      </div>
+                                                    </div>
+                                                  ) : (
+                                                    <p className="text-[10px] text-white/60 italic font-medium">No start date set</p>
+                                                  )}
+                                                </div>
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          </TooltipProvider>
                                         ))}
+                                        {t.assignees && t.assignees.length > 3 && (
+                                          <div className="w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-bold border-2 border-white bg-[#F4F5F7] text-[#42526E] shadow-sm z-0">
+                                            +{t.assignees.length - 3}
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
                                   </div>
@@ -954,26 +859,53 @@ const Tickets = () => {
                               <div className="flex -space-x-1.5 items-center">
                                 {t.assignees && t.assignees.length > 0 ? (
                                   <TooltipProvider delayDuration={0}>
-                                    {t.assignees.map((a: any, idx: number) => {
+                                    {t.assignees.slice(0, 3).map((a: any, idx: number) => {
                                       const isMe = Number(a.id) === Number(currentUser?.id);
                                       return (
                                         <Tooltip key={idx}>
                                           <TooltipTrigger asChild>
                                             <div
                                               className={cn(
-                                                "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white transition-all transform hover:-translate-y-0.5 cursor-help",
+                                                "relative w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white transition-all transform hover:-translate-y-0.5 cursor-help",
                                                 isMe ? "bg-[#0052CC] text-white z-10 shadow-sm" : "bg-[#DFE1E6] text-[#42526E] z-0"
                                               )}
                                             >
                                               {a.username.slice(0, 1).toUpperCase()}
+                                              {a.TicketAssignee?.startDate && (
+                                                <div className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-white rounded-full flex items-center justify-center shadow-md z-20 border border-[#EBECF0]">
+                                                  <Calendar className="w-2 h-2 text-[#0052CC]" />
+                                                </div>
+                                              )}
                                             </div>
                                           </TooltipTrigger>
-                                          <TooltipContent side="top" className="bg-[#172B4D] text-white border-none py-1 px-2 text-[11px] font-medium rounded-[3px] shadow-lg mb-1">
-                                            <p>{a.username}</p>
+                                          <TooltipContent side="top" className="bg-[#172B4D] text-white border-none py-1.5 px-2.5 rounded-[4px] shadow-xl mb-1 min-w-[140px]">
+                                            <div className="space-y-1.5">
+                                              <p className="font-bold text-[12px] border-b border-white/10 pb-1">{a.username}</p>
+                                              {(a.TicketAssignee?.startDate) ? (
+                                                <div className="pt-0.5">
+                                                  <div className="flex flex-col">
+                                                    <span className="text-[9px] font-bold text-white/50 uppercase">Start Date</span>
+                                                    <span className="text-[11px] font-medium text-white">
+                                                      {(() => {
+                                                        const d = new Date(a.TicketAssignee.startDate);
+                                                        return !isNaN(d.getTime()) ? format(d, "MMM d, yyyy") : "—";
+                                                      })()}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              ) : (
+                                                <p className="text-[11px] text-white/60 italic">No start date set</p>
+                                              )}
+                                            </div>
                                           </TooltipContent>
                                         </Tooltip>
                                       );
                                     })}
+                                    {t.assignees.length > 3 && (
+                                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-bold border-2 border-white bg-[#F4F5F7] text-[#42526E] shadow-sm z-0">
+                                        +{t.assignees.length - 3}
+                                      </div>
+                                    )}
                                   </TooltipProvider>
                                 ) : (
                                   <span className="text-[12px] text-gray-300 italic whitespace-nowrap">Unassigned</span>
@@ -1036,42 +968,6 @@ const Tickets = () => {
                 />
               </div>
             )}
-
-            {/* Sidebar Overlay/Drawer Backdrop */}
-            <AnimatePresence>
-              {(descriptionTarget || dialogOpen) && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  onClick={() => {
-                    setDescriptionTarget(null);
-                    setDialogOpen(false);
-                  }}
-                  className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-[50]"
-                />
-              )}
-            </AnimatePresence>
-
-            {/* Right Sidebar Form Panel (Edit/Rise) */}
-            <AnimatePresence mode="wait">
-              {dialogOpen && (
-                <TicketSidebarForm
-                  key="ticket-form"
-                  open={dialogOpen}
-                  onClose={() => setDialogOpen(false)}
-                  title={editingId ? "Edit ticket" : "Create ticket"}
-                  subtitle={editingId ? "Update ticket details" : "Create a new support or task ticket"}
-                  onSave={handleSave}
-                  editData={editData}
-                  setEditData={setEditData}
-                  projects={projects}
-                  errors={errors}
-                  setErrors={setErrors}
-                  isEditing={!!editingId}
-                />
-              )}
-            </AnimatePresence>
 
             {/* Right Sidebar Detail Panel */}
             <AnimatePresence mode="wait">

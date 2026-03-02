@@ -86,6 +86,15 @@ const Projects = () => {
     }
   }, [search, page, isFirstTime]);
 
+  useEffect(() => {
+    if (descriptionTarget) {
+      const updated = projects.find(p => p.id === descriptionTarget.id);
+      if (updated) {
+        setDescriptionTarget(updated);
+      }
+    }
+  }, [projects]);
+
   const openCreate = () => {
     setEditData(emptyProject());
     setEditingId(null);
@@ -126,8 +135,13 @@ const Projects = () => {
       };
 
       if (editingId) {
-        await projectService.update(editingId, payload);
+        const updatedProject = await projectService.update(editingId, payload);
         toast({ title: "Project Updated", description: `${editData.name} has been updated successfully.`, variant: "success" });
+
+        // If we are currently viewing this project in the details drawer, update it immediately
+        if (descriptionTarget?.id === editingId) {
+          setDescriptionTarget(updatedProject);
+        }
       } else {
         await projectService.create(payload);
         toast({ title: "Project Created", description: `${editData.name} has been created successfully.`, variant: "success" });
@@ -137,7 +151,8 @@ const Projects = () => {
           return;
         }
       }
-      fetchProjects();
+      await fetchProjects();
+      setEditingId(null);
       setDialogOpen(false);
     } catch (err) {
       toast({ title: "Error", description: "Failed to save project", variant: "destructive" });
@@ -280,7 +295,7 @@ const Projects = () => {
           <AnimatePresence mode="popLayout">
             {descriptionTarget && (
               <ProjectDetailView
-                key={`detail - ${descriptionTarget.id} `}
+                key={`project-detail-${descriptionTarget.id}`}
                 project={descriptionTarget}
                 onClose={() => setDescriptionTarget(null)}
                 onEdit={(p) => openEdit(p)}

@@ -15,7 +15,11 @@ const TicketAssignee = sequelize.define('TicketAssignee', {
         type: DataTypes.INTEGER,
         allowNull: false,
     },
-    joinDate: {
+    startDate: {
+        type: DataTypes.DATEONLY,
+        allowNull: true,
+    },
+    endDate: {
         type: DataTypes.DATEONLY,
         allowNull: true,
     },

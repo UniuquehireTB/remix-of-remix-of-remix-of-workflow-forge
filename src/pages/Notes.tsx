@@ -452,13 +452,13 @@ const Notes = () => {
                   onClick={() => openCreate("note")}
                   className="gap-1.5 rounded-[3px] px-4 h-8 shrink-0 bg-[#0052CC] hover:bg-[#0747A6] text-white border-none shadow-none font-bold text-[13px]"
                 >
-                  + Create note
+                  + Create Note
                 </Button>
                 <Button
                   onClick={() => openCreate("list")}
                   className="gap-1.5 rounded-[3px] px-4 h-8 shrink-0 bg-[#0052CC] hover:bg-[#0747A6] text-white border-none shadow-none font-bold text-[13px]"
                 >
-                  + Create list
+                  + Create List
                 </Button>
               </div>
             </div>
@@ -472,8 +472,8 @@ const Notes = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.04 }}
                   className={cn(
-                    "break-inside-avoid rounded-[3px] border border-[#DFE1E6] p-5 transition-all duration-200 hover:shadow-md hover:border-[#4C9AFF] group cursor-pointer relative bg-white flex flex-col min-h-[140px]",
-                    editingId === note.id && "ring-2 ring-[#0052CC] ring-offset-0"
+                    "break-inside-avoid rounded-xl border border-[#DFE1E6] p-6 transition-all duration-300 hover:shadow-[0_8px_25px_-5px_rgba(0,0,0,0.08)] hover:border-[#4C9AFF]/50 group cursor-pointer relative bg-white flex flex-col min-h-[160px]",
+                    editingId === note.id && "ring-2 ring-[#0052CC] ring-offset-2"
                   )}
                   onClick={() => openNoteDetail(note)}
                 >
@@ -537,8 +537,9 @@ const Notes = () => {
                   <div className="flex items-center justify-between mt-auto pt-4 border-t border-border/60">
                     <div className="min-w-0">
                       {note.projectId && (
-                        <div className="flex items-center gap-1.5 text-[12px] font-bold text-[#0052CC] bg-[#DEEBFF]/30 px-2 py-0.5 rounded-[2px] border border-[#B3D4FF]/30 truncate max-w-[120px]">
-                          <span>{projects.find(p => p.id.toString() === note.projectId.toString())?.name || "Project"}</span>
+                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#42526E] bg-[#F4F5F7] px-2 py-0.5 rounded-full border border-[#DFE1E6] truncate max-w-[120px] shrink-0">
+                          <Hash className="w-2.5 h-2.5 opacity-50 shrink-0" />
+                          <span className="truncate">{projects.find(p => p.id.toString() === note.projectId.toString())?.name || "Project"}</span>
                         </div>
                       )}
                     </div>
@@ -556,7 +557,12 @@ const Notes = () => {
                           </button>
                         </>
                       )}
-                      <ChevronRight className="w-4 h-4 text-[#6B778C] opacity-0 group-hover:opacity-100 transition-opacity" />
+                      {note.userId === currentUser?.id && (
+                        <button onClick={() => openShare(note)}
+                          className="w-7 h-7 rounded-[3px] flex items-center justify-center text-[#42526E] hover:text-[#0052CC] hover:bg-[#DEEBFF] transition-all opacity-0 group-hover:opacity-100">
+                          <Share2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </motion.div>
@@ -564,15 +570,18 @@ const Notes = () => {
             </div>
 
             {!loading && notes.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-32 animate-fade-in">
-                <div className="w-20 h-20 rounded-[3px] bg-[#F4F5F7] border border-[#DFE1E6] flex items-center justify-center mb-6">
-                  <FileText className="w-10 h-10 text-[#6B778C] opacity-40" />
+              <div className="flex flex-col items-center justify-center py-40 animate-fade-in group">
+                <div className="relative mb-8">
+                  <div className="absolute inset-0 bg-[#0052CC]/10 blur-3xl rounded-full scale-150 group-hover:bg-[#0052CC]/20 transition-all duration-700" />
+                  <div className="relative w-24 h-24 rounded-2xl bg-white border border-[#DFE1E6] flex items-center justify-center shadow-sm">
+                    <FileText className="w-10 h-10 text-[#0052CC] opacity-60" />
+                  </div>
                 </div>
-                <p className="text-[#172B4D] font-bold text-xl">No documents yet</p>
-                <p className="text-[14px] text-[#6B778C] mt-2">Capture ideas, project plans, and team tasks in a clean workspace.</p>
-                <div className="flex gap-4 mt-8">
-                  <Button onClick={() => openCreate("note")} className="bg-[#0052CC] hover:bg-[#0747A6] rounded-[3px] h-10 px-6 font-bold text-[12px]">Create note</Button>
-                  <Button variant="outline" onClick={() => openCreate("list")} className="border-[#DFE1E6] hover:bg-[#F4F5F7] rounded-[3px] h-10 px-6 font-bold text-[12px]">Create checklist</Button>
+                <h3 className="text-[#172B4D] font-bold text-xl tracking-tight">Your creative space is empty</h3>
+                <p className="text-[14px] text-[#6B778C] mt-2 max-w-sm text-center leading-relaxed font-medium">Capture fleeting thoughts, draft plans, and organize your tasks in one place.</p>
+                <div className="flex gap-4 mt-10">
+                  <Button onClick={() => openCreate("note")} className="bg-[#0052CC] hover:bg-[#0747A6] rounded-lg h-11 px-8 font-bold text-[13px] shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]">Create first note</Button>
+                  <Button variant="outline" onClick={() => openCreate("list")} className="border-[#DFE1E6] hover:bg-[#F4F5F7] rounded-lg h-11 px-8 font-bold text-[13px] text-[#42526E] transition-all">New checklist</Button>
                 </div>
               </div>
             )}
@@ -630,171 +639,180 @@ const Notes = () => {
                     animate={{ x: 0 }}
                     exit={{ x: "100%" }}
                     transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                    className="fixed top-0 right-0 z-[70] w-full max-w-2xl h-full bg-white border-l border-border shadow-2xl flex flex-col"
+                    className="fixed top-0 right-0 z-[70] w-full max-w-3xl h-full bg-white border-l border-[#EBECF0] shadow-2xl flex flex-col font-sans"
                   >
                     {/* Panel Toolbar */}
-                    <div className="px-6 py-3 border-b border-border/60 flex items-center justify-between bg-white shrink-0 min-h-[56px]">
-                      <div className="flex items-center gap-4">
-                        <span className="text-[18px] font-bold text-[#172B4D] capitalize">
-                          {panelMode === "create" ? "New" : "Document"} {createType}
-                        </span>
-                        <div className="w-px h-4 bg-border/60" />
-                        {isSyncing && (
-                          <div className="flex items-center gap-2 text-[10px] font-bold text-[#0052CC] animate-pulse">
-                            <div className="w-1.5 h-1.5 rounded-full bg-[#0052CC]" />
+                    <div className="px-6 py-4 flex items-center justify-between bg-white border-b border-[#EBECF0] shrink-0">
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "w-7 h-7 rounded-[4px] flex items-center justify-center text-white",
+                          createType === "list" ? "bg-[#403294]" : "bg-[#0747A6]"
+                        )}>
+                          {createType === "list" ? <List className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[14px] font-bold text-[#172B4D] leading-none mb-0.5">
+                            {panelMode === "create" ? "Create New" : "Edit Document"}
+                          </span>
+                          <span className="text-[10px] font-medium text-[#6B778C] capitalize">{createType}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {isSyncing ? (
+                          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#DEEBFF] text-[#0052CC] text-[10px] font-bold">
                             Saving...
                           </div>
-                        )}
-                        {!isSyncing && panelMode === "edit" && (
-                          <div className="flex items-center gap-2 text-[10px] font-bold text-[#00875A]">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            Saved
+                        ) : panelMode === "edit" && (
+                          <div className="flex items-center gap-1.5 text-[#006644] text-[10px] font-bold">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Saved
                           </div>
                         )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {activeNote?.userId === currentUser?.id && panelMode === "edit" && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[3px] text-[#42526E] hover:bg-[#F4F5F7]" onClick={() => openShare(activeNote!)}>
-                            <Share2 className="w-4 h-4" />
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[3px] text-[#42526E]" onClick={handleClosePanel}>
-                          <X className="w-4.5 h-4.5" />
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[3px] text-[#42526E] hover:bg-[#EBECF0]" onClick={handleClosePanel}>
+                          <X className="w-5 h-5" />
                         </Button>
                       </div>
                     </div>
 
                     <div className="flex-1 overflow-y-auto premium-scrollbar flex flex-col min-h-0 bg-white">
-                      <div className="flex-1 px-10 py-10 space-y-10 max-w-3xl mx-auto w-full">
+                      <div className="p-6 space-y-5">
                         {!canEdit && (
-                          <div className="flex items-center gap-3.5 p-4 rounded-[3px] bg-[#FFF0B3] border border-[#FFAB00]/20 text-[#172B4D] shadow-sm">
-                            <ShieldAlert className="w-5 h-5 text-[#FFAB00]" />
-                            <div>
-                              <p className="text-[12px] font-bold">Read-only document</p>
-                              <p className="text-[13px] opacity-80">You don't have permission to edit this page.</p>
-                            </div>
+                          <div className="flex items-center gap-3 p-3 rounded-[3px] bg-[#FFF0B3]/50 border border-[#FFAB00]/20 text-[#172B4D]">
+                            <ShieldAlert className="w-3.5 h-3.5 text-[#BF6000]" />
+                            <span className="text-[12px] font-medium">Read-only document.</span>
                           </div>
                         )}
 
-                        <div className="space-y-4">
-                          <input
-                            value={newTitle}
-                            onChange={e => setNewTitle(e.target.value)}
-                            placeholder="Page Title"
-                            disabled={!canEdit}
-                            className="w-full bg-transparent text-4xl font-bold focus:outline-none placeholder:text-[#DFE1E6] text-[#172B4D] disabled:opacity-50 transition-all tracking-tight leading-tight"
-                            autoFocus
-                          />
-
-                          <div className="flex items-center gap-6 pt-2">
-                            <div className="flex-1 max-w-[240px] space-y-1.5">
-                              <label className="text-[11px] font-bold text-[#6B778C]">Associated project</label>
-                              <AnimatedDropdown
-                                options={projects.map(p => ({ label: p.name, value: p.id.toString() }))}
-                                value={newProjectId?.toString() || ""}
-                                onChange={v => setNewProjectId(v || null)}
-                                placeholder="None"
-                                disabled={!canEdit}
-                                size="sm"
-                                triggerClassName="h-8 rounded-[3px] border-[#DFE1E6] bg-[#FAFBFC] hover:bg-[#EBECF0] text-[13px] font-bold text-[#172B4D]"
-                              />
-                            </div>
-
-                            {isShared && (
-                              <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-[#6B778C]">Author</label>
-                                <div className="flex items-center gap-2 h-8">
-                                  <div className="w-6 h-6 rounded-full bg-[#0052CC] flex items-center justify-center text-[10px] font-bold text-white uppercase">{activeNote?.user?.username.charAt(0)}</div>
-                                  <span className="text-[13px] font-bold text-[#172B4D]">{activeNote?.user?.username}</span>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="h-px bg-border/40" />
-
-                        <div className="space-y-6">
-                          {createType === "note" ? (
-                            <textarea
-                              value={newContent}
-                              onChange={e => setNewContent(e.target.value)}
-                              placeholder="Start writing..."
+                        <div className="space-y-5">
+                          {/* Project Field - Full Width */}
+                          <div className="space-y-1.5">
+                            <label className="text-[12px] font-bold text-[#6B778C] block">Associated Project</label>
+                            <AnimatedDropdown
+                              options={projects.map(p => ({ label: p.name, value: p.id.toString() }))}
+                              value={newProjectId?.toString() || ""}
+                              onChange={v => setNewProjectId(v || null)}
+                              placeholder="None"
                               disabled={!canEdit}
-                              className="w-full bg-transparent border-none text-[16px] min-h-[500px] focus:outline-none transition-all resize-none disabled:opacity-60 leading-relaxed font-normal text-[#172B4D] placeholder:text-[#DFE1E6]"
+                              size="sm"
+                              triggerClassName="w-full h-9 rounded-[3px] border-[#EBECF0] bg-white hover:border-[#DFE1E6] text-[13px] font-medium text-[#172B4D] px-3.5 shadow-none transition-all focus:border-[#0052CC]"
                             />
-                          ) : (
-                            <div className="space-y-4 pt-2">
-                              {newListItems.map((item, idx) => (
-                                <div key={idx} className="flex items-center gap-4 group/item">
-                                  <button
-                                    type="button"
-                                    disabled={!canEdit}
-                                    onClick={() => {
-                                      const updated = [...newListItems];
-                                      updated[idx].checked = !updated[idx].checked;
-                                      setNewListItems(updated);
-                                    }}
-                                    className={cn(
-                                      "w-5 h-5 rounded-[2px] border flex items-center justify-center transition-all shadow-none",
-                                      item.checked ? "bg-[#00875A] border-[#00875A]" : "bg-white border-[#DFE1E6] hover:border-[#4C9AFF]"
-                                    )}
-                                  >
-                                    {item.checked && <Check className="w-3.5 h-3.5 text-white stroke-[4px]" />}
-                                  </button>
-                                  <input
-                                    value={item.text}
-                                    disabled={!canEdit}
-                                    onChange={e => {
-                                      const updated = [...newListItems];
-                                      updated[idx].text = e.target.value;
-                                      setNewListItems(updated);
-                                    }}
-                                    placeholder="Task description..."
-                                    className={cn(
-                                      "flex-1 bg-transparent text-[15px] font-medium focus:outline-none disabled:opacity-50 transition-all text-[#172B4D]",
-                                      item.checked && "line-through text-[#6B778C] italic"
-                                    )}
-                                  />
+                          </div>
+
+                          {/* Title Area */}
+                          <div className="space-y-1.5">
+                            <label className="text-[12px] font-bold text-[#6B778C] block">
+                              {createType === "note" ? "Note Title" : "List Title"}
+                            </label>
+                            <input
+                              value={newTitle}
+                              onChange={e => setNewTitle(e.target.value)}
+                              placeholder={`Enter ${createType} title...`}
+                              disabled={!canEdit}
+                              className="w-full bg-white border border-[#EBECF0] rounded-[3px] px-3.5 py-3 text-[18px] font-bold focus:outline-none focus:border-[#0052CC] placeholder:text-[#C1C7D0] text-[#172B4D] disabled:opacity-50 transition-all shadow-none"
+                              autoFocus
+                            />
+                          </div>
+
+                          {/* Editor Content Area */}
+                          <div className="space-y-1.5 flex-1 flex flex-col min-h-[450px]">
+                            <label className="text-[12px] font-bold text-[#6B778C] block">
+                              {createType === "note" ? "Page Content" : "Checklist Items"}
+                            </label>
+                            <div className="flex-1 bg-white border border-[#EBECF0] rounded-[3px] transition-all focus-within:border-[#0052CC] flex flex-col">
+                              {createType === "note" ? (
+                                <textarea
+                                  value={newContent}
+                                  onChange={e => setNewContent(e.target.value)}
+                                  placeholder="Start writing..."
+                                  disabled={!canEdit}
+                                  className="w-full flex-1 bg-transparent border-none p-3.5 text-[14px] focus:outline-none transition-all resize-none disabled:opacity-60 leading-relaxed font-normal text-[#172B4D] placeholder:text-[#C1C7D0]"
+                                />
+                              ) : (
+                                <div className="p-4 space-y-3">
+                                  {newListItems.map((item, idx) => (
+                                    <div key={idx} className="flex items-center gap-3 group/item border-b border-[#F4F5F7] pb-2 last:border-0 last:pb-0">
+                                      <button
+                                        type="button"
+                                        disabled={!canEdit}
+                                        onClick={() => {
+                                          const updated = [...newListItems];
+                                          updated[idx].checked = !updated[idx].checked;
+                                          setNewListItems(updated);
+                                        }}
+                                        className={cn(
+                                          "w-5 h-5 rounded-[4px] border flex items-center justify-center transition-all bg-white",
+                                          item.checked ? "bg-[#36B37E] border-[#36B37E]" : "border-[#DFE1E6] hover:border-[#4C9AFF]"
+                                        )}
+                                      >
+                                        {item.checked && <Check className="w-3.5 h-3.5 text-white stroke-[4px]" />}
+                                      </button>
+                                      <input
+                                        value={item.text}
+                                        disabled={!canEdit}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter") {
+                                            setNewListItems(prev => [...prev, { id: `new-${Date.now()}`, text: "", checked: false }]);
+                                          }
+                                        }}
+                                        onChange={e => {
+                                          const updated = [...newListItems];
+                                          updated[idx].text = e.target.value;
+                                          setNewListItems(updated);
+                                        }}
+                                        placeholder="Add task..."
+                                        className={cn(
+                                          "flex-1 bg-transparent text-[14px] font-medium focus:outline-none disabled:opacity-50 transition-all text-[#172B4D]",
+                                          item.checked && "line-through text-[#6B778C]/70 italic"
+                                        )}
+                                      />
+                                      {canEdit && newListItems.length > 1 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setNewListItems(prev => prev.filter((_, i) => i !== idx))}
+                                          className="opacity-0 group-hover/item:opacity-100 p-1.5 rounded-[4px] hover:bg-[#FFEBE6] text-[#6B778C] hover:text-[#DE350B] transition-opacity"
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  ))}
                                   {canEdit && (
                                     <button
                                       type="button"
-                                      onClick={() => setNewListItems(prev => prev.filter((_, i) => i !== idx))}
-                                      className="opacity-0 group-hover/item:opacity-100 p-1 rounded-[3px] hover:bg-[#FFEBE6] text-[#6B778C] hover:text-[#DE350B] transition-all"
+                                      onClick={() => setNewListItems(prev => [...prev, { id: `new-${Date.now()}`, text: "", checked: false }])}
+                                      className="w-full flex items-center gap-3 px-0.5 py-2 text-[#0052CC] hover:text-[#0747A6] group transition-colors"
                                     >
-                                      <X className="w-4 h-4" />
+                                      <div className="w-5 h-5 rounded-[4px] border border-dashed border-[#B3D4FF] flex items-center justify-center group-hover:border-[#0052CC] transition-colors">
+                                        <span className="text-[16px] leading-none mb-0.5 font-bold">+</span>
+                                      </div>
+                                      <span className="text-[13px] font-bold">New Item</span>
                                     </button>
                                   )}
                                 </div>
-                              ))}
-                              {canEdit && (
-                                <button
-                                  type="button"
-                                  onClick={() => setNewListItems(prev => [...prev, { id: `new-${Date.now()}`, text: "", checked: false }])}
-                                  className="text-[14px] text-[#0052CC] font-bold mt-4 hover:bg-[#DEEBFF] px-3 py-1.5 rounded-[3px] transition-all flex items-center gap-2 w-fit"
-                                >
-                                  <span>+ Add task</span>
-                                </button>
                               )}
                             </div>
-                          )}
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="px-8 py-5 border-t border-border/60 bg-[#FAFBFC] flex items-center justify-end gap-3 shrink-0">
-                      <Button variant="ghost" onClick={handleClosePanel} className="rounded-[3px] h-9 px-6 font-bold text-[#42526E] hover:bg-[#EBECF0]">
-                        Close
-                      </Button>
-                      {canEdit && (
-                        <Button
-                          onClick={() => panelMode === "create" ? handleCreate() : handleUpdate(true)}
-                          loading={isSaving}
-                          className="rounded-[3px] h-9 px-8 bg-[#0052CC] hover:bg-[#0747A6] text-white font-bold shadow-none text-[13px]"
-                        >
-                          {panelMode === "create" ? "Create Page" : "Done"}
+                    <div className="px-6 py-4 border-t border-[#EBECF0] bg-white flex items-center justify-between shrink-0">
+                      <div className="flex items-center gap-2 text-[10px] font-bold text-[#6B778C]">
+                        <Shield className="w-3 h-3" /> PRIVATE {createType.toUpperCase()}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Button variant="ghost" onClick={handleClosePanel} className="rounded-[3px] h-9 px-5 font-bold text-[#42526E] hover:bg-[#EBECF0]">
+                          Cancel
                         </Button>
-                      )}
+                        {canEdit && (
+                          <Button
+                            onClick={() => panelMode === "create" ? handleCreate() : handleUpdate(true)}
+                            loading={isSaving}
+                            className="rounded-[3px] h-9 px-8 bg-[#0052CC] hover:bg-[#0747A6] text-white font-bold shadow-none text-[13px]"
+                          >
+                            {panelMode === "create" ? "Create Page" : "Save Changes"}
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </motion.div>
                 </>

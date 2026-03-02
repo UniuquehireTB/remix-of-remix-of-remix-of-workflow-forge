@@ -65,12 +65,12 @@ export function ProjectSidebarForm({
             <div className="flex-1 overflow-y-auto premium-scrollbar p-8 space-y-8 bg-white">
                 <div className="max-w-xl mx-auto space-y-8">
                     <FormField
-                        label={<div className="flex justify-between w-full"><span>Project name</span><span className={cn("text-[10px]", (editData.name?.length || 0) > 70 ? "text-[#DE350B]" : "text-[#6B778C]")}>{editData.name?.length || 0}/80</span></div>}
-                        icon={FolderKanban} required error={errors.name} labelClassName="text-[#6B778C] font-bold text-[11px] w-full"
+                        label={<div className="flex justify-between items-center w-full"><span>Project name</span><div className="flex items-center gap-1.5"><span className={cn("text-[11px] font-bold", (editData.name?.length || 0) > 70 ? "text-[#DE350B]" : "text-[#6B778C]")}>{editData.name?.length || 0}/80</span><span className="text-[#DE350B] font-bold text-[14px] leading-none select-none">*</span></div></div>}
+                        error={errors.name} labelClassName="text-[#44546F] font-bold text-[13px] w-full"
                     >
                         <input
                             className={cn(
-                                "premium-input h-10 border-[#DFE1E6] hover:bg-[#F4F5F7] focus:border-[#4C9AFF] transition-all text-[#172B4D]",
+                                "premium-input h-[40px] border-[#A5ADBA] hover:bg-[#F4F5F7] focus:border-[#4C9AFF] transition-all text-[#172B4D]",
                                 errors.name && "!border-[#DE350B] focus:ring-[#DE350B]/10"
                             )}
                             placeholder="e.g. Workflow optimization"
@@ -83,10 +83,10 @@ export function ProjectSidebarForm({
                         />
                     </FormField>
 
-                    <FormField label="Client name" icon={Building2} required error={errors.client} labelClassName="text-[#6B778C] font-bold text-[11px]">
+                    <FormField label="Client name" required error={errors.client} labelClassName="text-[#44546F] font-bold text-[13px]">
                         <input
                             className={cn(
-                                "premium-input h-10 border-[#DFE1E6] hover:bg-[#F4F5F7] focus:border-[#4C9AFF] transition-all text-[#172B4D]",
+                                "premium-input h-[40px] border-[#A5ADBA] hover:bg-[#F4F5F7] focus:border-[#4C9AFF] transition-all text-[#172B4D]",
                                 errors.client && "!border-[#DE350B] focus:ring-[#DE350B]/10"
                             )}
                             placeholder="e.g. Acme corp"
@@ -99,12 +99,12 @@ export function ProjectSidebarForm({
                     </FormField>
 
                     <FormField
-                        label={<div className="flex justify-between w-full"><span>Description</span><span className={cn("text-[10px]", (editData.description?.length || 0) > 450 ? "text-[#DE350B]" : "text-[#6B778C]")}>{editData.description?.length || 0}/500</span></div>}
-                        icon={FileText} required error={errors.description} labelClassName="text-[#6B778C] font-bold text-[11px] w-full"
+                        label={<div className="flex justify-between items-center w-full"><span>Description</span><div className="flex items-center gap-1.5"><span className={cn("text-[11px] font-bold", (editData.description?.length || 0) > 450 ? "text-[#DE350B]" : "text-[#6B778C]")}>{editData.description?.length || 0}/500</span><span className="text-[#DE350B] font-bold text-[14px] leading-none select-none">*</span></div></div>}
+                        error={errors.description} labelClassName="text-[#44546F] font-bold text-[13px] w-full"
                     >
                         <textarea
                             className={cn(
-                                "premium-input min-h-[140px] resize-none border-[#DFE1E6] hover:bg-[#F4F5F7] focus:border-[#4C9AFF] transition-all text-[#172B4D] leading-relaxed",
+                                "premium-input min-h-[160px] resize-none border-[#A5ADBA] hover:bg-[#F4F5F7] focus:border-[#4C9AFF] transition-all text-[#172B4D] leading-relaxed p-4",
                                 errors.description && "!border-[#DE350B] focus:ring-[#DE350B]/10"
                             )}
                             placeholder="Provide a brief overview of the project's goals and scope..."
@@ -121,14 +121,14 @@ export function ProjectSidebarForm({
                     <div className="space-y-4 pt-4 border-t border-border/40">
                         <MemberSelector
                             label="Team members"
-                            icon={Users}
                             variant="projects"
                             showSelf={true}
                             showTeam={false}
                             selected={editData.members || []}
                             onChange={members => setEditData((d: any) => ({ ...d, members }))}
                             error={errors.members}
-                            labelClassName="text-[#6B778C] font-bold text-[12px]"
+                            required
+                            labelClassName="text-[#44546F] font-bold text-[13px]"
                         />
                     </div>
                 </div>
@@ -142,9 +142,8 @@ export function ProjectSidebarForm({
                 <Button
                     onClick={onSave}
                     loading={isSaving}
-                    className="h-10 px-8 rounded-[3px] bg-[#0052CC] hover:bg-[#0747A6] text-white font-bold shadow-none transition-all flex items-center gap-2"
+                    className="h-10 px-8 rounded-[3px] bg-[#0052CC] hover:bg-[#0747A6] text-white font-bold shadow-none transition-all flex items-center justify-center min-w-[140px]"
                 >
-                    <Check className="w-4 h-4" />
                     {isEditing ? "Save changes" : "Create project"}
                 </Button>
             </div>

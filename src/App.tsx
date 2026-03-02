@@ -12,6 +12,8 @@ import NotFound from "./pages/NotFound";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AutoLogoutProvider } from "./components/AutoLogoutProvider";
+import { TicketDraftProvider } from "./hooks/useTicketDraft";
+import { GlobalTicketSidebarForm, GlobalTicketBackdrop } from "./components/GlobalTicketSidebarForm";
 
 const queryClient = new QueryClient();
 
@@ -22,20 +24,24 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AutoLogoutProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
+          <TicketDraftProvider>
+            <GlobalTicketBackdrop />
+            <GlobalTicketSidebarForm />
+            <Routes>
+              <Route path="/login" element={<Login />} />
 
-            {/* Protected Routes */}
-            <Route element={<ProtectedRoute />}>
-              <Route path="/" element={<Navigate to="/tickets" replace />} />
-              <Route path="/projects" element={<Projects />} />
-              <Route path="/tickets" element={<Tickets />} />
-              <Route path="/notes" element={<Notes />} />
-              <Route path="/welcome" element={<Welcome />} />
-            </Route>
+              {/* Protected Routes */}
+              <Route element={<ProtectedRoute />}>
+                <Route path="/" element={<Navigate to="/tickets" replace />} />
+                <Route path="/projects" element={<Projects />} />
+                <Route path="/tickets" element={<Tickets />} />
+                <Route path="/notes" element={<Notes />} />
+                <Route path="/welcome" element={<Welcome />} />
+              </Route>
 
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </TicketDraftProvider>
         </AutoLogoutProvider>
       </BrowserRouter>
     </TooltipProvider>

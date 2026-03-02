@@ -76,7 +76,7 @@ export function ProjectDetailView({
                                     <Pencil className="w-3.5 h-3.5" />
                                 </Button>
                             </TooltipTrigger>
-                            <TooltipContent><p className="text-xs">Edit</p></TooltipContent>
+                            <TooltipContent className="text-xs bg-[#172B4D] text-white border-none py-1.5 px-2">Edit</TooltipContent>
                         </Tooltip>
 
                         <Tooltip>
@@ -85,7 +85,7 @@ export function ProjectDetailView({
                                     <Trash2 className="w-3.5 h-3.5" />
                                 </Button>
                             </TooltipTrigger>
-                            <TooltipContent><p className="text-xs">Delete</p></TooltipContent>
+                            <TooltipContent className="text-xs bg-[#172B4D] text-white border-none py-1.5 px-2">Delete</TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
 
@@ -130,25 +130,23 @@ export function ProjectDetailView({
                         <div className="h-px bg-border/40" />
 
                         {/* Recent Activity / Ticket Stats */}
-                        <div className="space-y-4">
-                            <h2 className="text-[12px] font-bold text-[#42526E] mb-2">Ticket summary</h2>
-                            <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-3">
+                            <h2 className="text-[12px] font-bold text-[#42526E]">Ticket summary</h2>
+                            <div className="grid grid-cols-2 gap-3">
                                 {[
                                     { label: 'Open', count: stats['Open'], color: '#42526E', bg: '#F4F5F7' },
                                     { label: 'In Progress', count: stats['In Progress'], color: '#0052CC', bg: '#DEEBFF' },
                                     { label: 'On Hold', count: stats['On Hold'], color: '#BF2600', bg: '#FFEBE6' },
                                     { label: 'Closed', count: stats['Closed'], color: '#006644', bg: '#E3FCEF' }
                                 ].map((s) => (
-                                    <div key={s.label} className="p-4 rounded-[3px] border border-border bg-white hover:shadow-sm transition-all group">
-                                        <div className="flex flex-col gap-1">
-                                            <span className="text-[12px] font-bold text-[#6B778C]">{s.label}</span>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-2xl font-bold text-[#172B4D]">{formatCount(s.count || 0)}</span>
-                                                <div className="w-6 h-6 rounded-[2px] flex items-center justify-center" style={{ backgroundColor: s.bg }}>
-                                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
-                                                </div>
+                                    <div key={s.label} className="flex items-center justify-between p-2.5 rounded-[3px] border border-border bg-[#F4F5F7]/30 hover:bg-[#F4F5F7] transition-colors cursor-default">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-5 h-5 rounded-[2px] flex items-center justify-center shrink-0" style={{ backgroundColor: s.bg }}>
+                                                <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: s.color }} />
                                             </div>
+                                            <span className="text-[13px] font-medium text-[#42526E]">{s.label}</span>
                                         </div>
+                                        <span className="text-[13px] font-bold text-[#172B4D]">{formatCount(s.count || 0)}</span>
                                     </div>
                                 ))}
                             </div>

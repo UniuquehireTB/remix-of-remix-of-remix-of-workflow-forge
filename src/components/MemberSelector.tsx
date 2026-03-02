@@ -1,12 +1,18 @@
 import { useState, useEffect, useRef } from "react";
 import { authService } from "@/services/authService";
 import { cn } from "@/lib/utils";
-import { Check, User as UserIcon, Shield, ShieldOff, X, ChevronDown, CheckCircle2 } from "lucide-react";
+import { Check, User as UserIcon, Shield, ShieldOff, X, ChevronDown, CheckCircle2, Calendar } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverTrigger, PopoverContent, PopoverAnchor } from "@/components/ui/popover";
 import { motion, AnimatePresence } from "framer-motion";
 import { AnimatedDatePicker } from "@/components/AnimatedDatePicker";
 import { format } from "date-fns";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface Member {
     id: number;
@@ -22,7 +28,7 @@ interface MemberSelectorProps {
     label?: string;
     icon?: any;
     error?: string;
-    selected: any[]; // Array of ids (numbers) or objects {id, joinDate}
+    selected: any[]; // Array of ids (numbers) or objects {id, startDate, endDate}
     onChange: (assignees: any[]) => void;
     canEditMap?: Record<number, boolean>;
     onEditToggle?: (id: number, canEdit: boolean) => void;
@@ -33,6 +39,7 @@ interface MemberSelectorProps {
     startDate?: string;
     endDate?: string;
     labelClassName?: string;
+    required?: boolean;
 }
 
 export function MemberSelector({
@@ -50,6 +57,7 @@ export function MemberSelector({
     startDate,
     endDate,
     labelClassName,
+    required = false,
 }: MemberSelectorProps) {
     const [members, setMembers] = useState<Member[]>([]);
     const [loading, setLoading] = useState(true);
@@ -87,9 +95,10 @@ export function MemberSelector({
         });
     };
 
-    const getJoinDate = (id: number) => {
+    const getMemberDate = (id: number, type: 'start' | 'end') => {
         const found = selected.find(s => (typeof s === 'object' ? s.id : s) === id);
-        return typeof found === 'object' ? found.joinDate : "";
+        if (typeof found !== 'object') return "";
+        return type === 'start' ? found.startDate : found.endDate;
     };
 
     const toggleMember = (id: number) => {
@@ -104,16 +113,22 @@ export function MemberSelector({
             }));
         } else {
             const newItem = isTickets
-                ? { id, joinDate: "" }
+                ? { id, startDate: "", endDate: "" }
                 : id;
             onChange([...selected, newItem]);
         }
     };
 
-    const updateJoinDate = (id: number, date: string) => {
+    const updateMemberDate = (id: number, type: 'start' | 'end', date: string) => {
         onChange(selected.map(s => {
             const sid = typeof s === 'object' ? s.id : s;
-            if (sid === id) return { id: sid, joinDate: date };
+            if (sid === id) {
+                return {
+                    ...s,
+                    id: sid,
+                    [type === 'start' ? 'startDate' : 'endDate']: date
+                };
+            }
             return s;
         }));
     };
@@ -140,7 +155,7 @@ export function MemberSelector({
             const newTeam = eligibleTeamMembers.map(m => {
                 const existing = selected.find(s => (typeof s === 'object' ? s.id : s) === m.id);
                 if (existing) return existing;
-                return isTickets ? { id: m.id, joinDate: "" } : m.id;
+                return isTickets ? { id: m.id, startDate: "", endDate: "" } : m.id;
             });
             const self = selected.find(s => String(typeof s === 'object' ? s.id : s) === String(currentUser?.id));
             onChange(self ? [self, ...newTeam] : newTeam);
@@ -166,7 +181,10 @@ export function MemberSelector({
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     {Icon && <Icon className="w-3.5 h-3.5 text-[#6B778C]" />}
-                    <span className={cn("text-[12px] font-bold text-[#6B778C] tracking-tight", labelClassName)}>{label}</span>
+                    <span className={cn("text-[12px] font-bold text-[#6B778C] tracking-tight", labelClassName)}>
+                        {label}
+                        {required && <span className="text-[#DE350B] ml-1">*</span>}
+                    </span>
                 </div>
                 <div className="flex items-center gap-2">
                     {/* Self Button */}
@@ -212,9 +230,9 @@ export function MemberSelector({
                 <PopoverAnchor asChild>
                     <div
                         className={cn(
-                            "min-h-[40px] py-1.5 rounded-[3px] border bg-white transition-all flex flex-wrap items-center px-3 gap-2 group cursor-text",
+                            "min-h-[40px] py-1 rounded-[3px] border bg-white transition-all flex flex-wrap items-center px-3 gap-2 group cursor-text",
                             "hover:bg-[#F4F5F7] hover:border-[#DFE1E6]",
-                            showDropdown ? "border-[#4C9AFF] bg-white ring-1 ring-[#4C9AFF]" : (error ? "border-[#DE350B]" : "border-[#DFE1E6]")
+                            showDropdown ? "border-[#4C9AFF] bg-white ring-2 ring-[#4C9AFF]/20" : (error ? "border-[#DE350B]" : "border-[#A5ADBA]")
                         )}
                         onClick={() => {
                             setShowDropdown(true);
@@ -225,7 +243,8 @@ export function MemberSelector({
                             <AnimatePresence>
                                 {selected.map((s) => {
                                     const id = typeof s === 'object' ? s.id : s;
-                                    const joinDate = typeof s === 'object' ? s.joinDate : "";
+                                    const memberStartDate = typeof s === 'object' ? s.startDate : "";
+                                    const memberEndDate = typeof s === 'object' ? s.endDate : "";
 
                                     let m = members.find(member => String(member.id) === String(id));
                                     if (!m && currentUser && String(currentUser.id) === String(id)) {
@@ -235,10 +254,8 @@ export function MemberSelector({
                                     if (!m) return null;
 
                                     const isInvalid = (() => {
-                                        if (!joinDate) return false;
-                                        const d = new Date(joinDate);
-                                        if (startDate && d < new Date(startDate)) return true;
-                                        if (endDate && d > new Date(endDate)) return true;
+                                        if (memberStartDate && startDate && new Date(memberStartDate) < new Date(startDate)) return true;
+                                        if (memberStartDate && endDate && new Date(memberStartDate) > new Date(endDate)) return true;
                                         return false;
                                     })();
 
@@ -264,29 +281,60 @@ export function MemberSelector({
                                             {isTickets && (
                                                 <div className="flex items-center gap-1 h-full">
                                                     <div className="h-4 w-px bg-[#DFE1E6] mx-0.5" />
-                                                    <AnimatedDatePicker
-                                                        value={joinDate}
-                                                        onChange={(v) => updateJoinDate(id, v)}
-                                                        className="w-auto"
-                                                        disabled={!startDate && !endDate}
-                                                        minDate={startDate}
-                                                        maxDate={endDate}
-                                                        triggerClassName={cn(
-                                                            "h-6 min-w-[24px] px-1 rounded-[3px] flex items-center justify-center gap-1.5 transition-colors",
-                                                            joinDate ? "bg-[#F4F5F7] text-[#42526E] border border-[#DFE1E6]" : "text-[#42526E] hover:bg-[#F4F5F7]"
-                                                        )}
-                                                        placeholder=""
-                                                        showIcon={true}
-                                                        icon={<div className="w-3.5 h-3.5 opacity-60"><ChevronDown className="w-full h-full" /></div>}
-                                                    >
-                                                        {joinDate && (
-                                                            <div className="flex items-center gap-1.5 pr-1">
-                                                                <span className="text-[10px] font-bold text-[#172B4D]">
-                                                                    {format(new Date(joinDate), "MMM d")}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                    </AnimatedDatePicker>
+                                                    <div className="flex items-center gap-0.5">
+                                                        {/* Start Date */}
+                                                        <AnimatedDatePicker
+                                                            value={memberStartDate}
+                                                            onChange={(v) => updateMemberDate(id, 'start', v)}
+                                                            className="w-auto"
+                                                            minDate={startDate}
+                                                            maxDate={endDate}
+                                                            disabled={!endDate}
+                                                            clearable
+                                                            triggerClassName={cn(
+                                                                "h-6 min-w-[24px] px-1 rounded-[3px] flex items-center justify-center gap-1.5 transition-colors",
+                                                                memberStartDate ? "bg-[#F4F5F7] text-[#42526E] border border-[#DFE1E6]" : "text-[#42526E] hover:bg-[#F4F5F7]",
+                                                                !endDate && "opacity-40 grayscale cursor-not-allowed"
+                                                            )}
+                                                            placeholder=""
+                                                            showIcon={true}
+                                                            icon={
+                                                                !endDate ? (
+                                                                    <TooltipProvider>
+                                                                        <Tooltip>
+                                                                            <TooltipTrigger asChild>
+                                                                                <div className="w-3.5 h-3.5 opacity-60"><Calendar className="w-full h-full" /></div>
+                                                                            </TooltipTrigger>
+                                                                            <TooltipContent className="bg-[#172B4D] text-white text-[10px] py-1 px-2 border-none font-bold">Set ticket Due Date first</TooltipContent>
+                                                                        </Tooltip>
+                                                                    </TooltipProvider>
+                                                                ) : (
+                                                                    <TooltipProvider>
+                                                                        <Tooltip>
+                                                                            <TooltipTrigger asChild>
+                                                                                <div className="w-3.5 h-3.5 opacity-60"><Calendar className="w-full h-full" /></div>
+                                                                            </TooltipTrigger>
+                                                                            <TooltipContent className="bg-[#172B4D] text-white text-[10px] py-1 px-2 border-none font-bold">
+                                                                                {startDate ? `Range: ${format(new Date(startDate), "MMM d")} - ${format(new Date(endDate), "MMM d")}` : `Must be before ${format(new Date(endDate), "MMM d")}`}
+                                                                            </TooltipContent>
+                                                                        </Tooltip>
+                                                                    </TooltipProvider>
+                                                                )
+                                                            }
+                                                        >
+                                                            {memberStartDate && (
+                                                                <div className="flex flex-col items-start pr-1 -space-y-0.5">
+                                                                    <span className="text-[7px] font-bold text-[#6B778C]/70 uppercase tracking-tighter">Start</span>
+                                                                    <span className="text-[9px] font-bold text-[#172B4D]">
+                                                                        {(() => {
+                                                                            const d = new Date(memberStartDate);
+                                                                            return !isNaN(d.getTime()) ? format(d, "MMM d") : "";
+                                                                        })()}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </AnimatedDatePicker>
+                                                    </div>
                                                 </div>
                                             )}
 
@@ -393,11 +441,14 @@ export function MemberSelector({
                                             <div className="flex items-center gap-3">
                                                 {active && (
                                                     <div className="flex items-center gap-3 animate-in fade-in zoom-in-95 duration-200">
-                                                        {isTickets && getJoinDate(m.id) && (
+                                                        {isTickets && getMemberDate(m.id, 'start') && (
                                                             <div className="flex flex-col items-end opacity-60">
                                                                 <span className="text-[8px] font-bold text-[#6B778C]">Start</span>
                                                                 <span className="text-[10px] font-bold text-[#172B4D]">
-                                                                    {format(new Date(getJoinDate(m.id)), "MMM d")}
+                                                                    {(() => {
+                                                                        const d = new Date(getMemberDate(m.id, 'start'));
+                                                                        return !isNaN(d.getTime()) ? format(d, "MMM d") : "";
+                                                                    })()}
                                                                 </span>
                                                             </div>
                                                         )}

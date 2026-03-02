@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { LucideIcon } from "lucide-react";
+import { LucideIcon, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface FormFieldProps {
@@ -28,8 +28,9 @@ export function FormField({ label, icon: Icon, error, required, children, classN
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
-            className="text-[12px] text-[#DE350B] font-medium pt-1"
+            className="text-[12px] text-[#DE350B] font-medium pt-1 flex items-center gap-1"
           >
+            <AlertCircle className="w-3.5 h-3.5 fill-[#DE350B] text-white" />
             {error}
           </motion.p>
         )}

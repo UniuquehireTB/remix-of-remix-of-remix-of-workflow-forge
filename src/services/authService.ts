@@ -4,7 +4,7 @@ let _refreshing: Promise<void> | null = null;
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 const doRequest = async (endpoint: string, options: any = {}): Promise<any> => {
-    const token = sessionStorage.getItem('token');
+    const token = localStorage.getItem('token');
     const headers = {
         'Content-Type': 'application/json',
         ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
@@ -12,7 +12,16 @@ const doRequest = async (endpoint: string, options: any = {}): Promise<any> => {
     };
 
     const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
-    const data = await response.json();
+
+    let data = null;
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+        try {
+            data = await response.json();
+        } catch (e) {
+            console.error("Failed to parse JSON response", e);
+        }
+    }
 
     return { response, data };
 };
@@ -34,24 +43,26 @@ export const apiService = {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
+                                'Authorization': `Bearer ${localStorage.getItem('token')}`,
                             },
                             body: JSON.stringify({}),
                         });
                         if (!refreshResp.ok) throw new Error('refresh_failed');
                         const refreshData = await refreshResp.json();
                         if (refreshData.token) {
-                            sessionStorage.setItem('token', refreshData.token);
-                            sessionStorage.setItem('user', JSON.stringify(refreshData.user));
+                            localStorage.setItem('token', refreshData.token);
+                            localStorage.setItem('user', JSON.stringify(refreshData.user));
                         }
                     })().finally(() => { _refreshing = null; });
                 }
                 await _refreshing;
             } catch {
                 // Refresh also failed → force logout
-                sessionStorage.removeItem('token');
-                sessionStorage.removeItem('user');
-                window.location.href = '/login';
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                if (window.location.pathname !== '/login') {
+                    window.location.href = '/login';
+                }
                 throw new Error('Session expired. Please login again.');
             }
 
@@ -61,9 +72,11 @@ export const apiService = {
 
         // Still 401 after retry → give up
         if (response.status === 401) {
-            sessionStorage.removeItem('token');
-            sessionStorage.removeItem('user');
-            window.location.href = '/login';
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            if (window.location.pathname !== '/login') {
+                window.location.href = '/login';
+            }
             throw new Error('Session expired. Please login again.');
         }
 
@@ -89,20 +102,24 @@ export const authService = {
     login: async (credentials: any) => {
         const data = await apiService.post('/auth/login', credentials);
         if (data.token) {
-            sessionStorage.setItem('token', data.token);
-            sessionStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user));
         }
         return data;
     },
 
     logout: () => {
-        sessionStorage.removeItem('token');
-        sessionStorage.removeItem('user');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
     },
 
     getCurrentUser: () => {
-        const user = sessionStorage.getItem('user');
+        const user = localStorage.getItem('user');
         return user ? JSON.parse(user) : null;
+    },
+
+    getToken: () => {
+        return localStorage.getItem('token');
     },
 
     getMembersList: async () => {
@@ -120,8 +137,8 @@ export const authService = {
     refresh: async () => {
         const data = await apiService.post('/auth/refresh', {});
         if (data.token) {
-            sessionStorage.setItem('token', data.token);
-            sessionStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user));
         }
         return data;
     }
@@ -131,6 +148,9 @@ export const projectService = {
     getAll: async (params: { search?: string, page?: number, limit?: number }) => {
         const query = new URLSearchParams(params as any).toString();
         return apiService.get(`/projects?${query}`);
+    },
+    getById: async (id: number) => {
+        return apiService.get(`/projects/${id}`);
     },
     create: async (projectData: any) => {
         return apiService.post('/projects', projectData);

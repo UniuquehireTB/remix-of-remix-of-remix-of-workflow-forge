@@ -81,7 +81,7 @@ const getAllTickets = async (req, res) => {
                     model: User,
                     as: 'assignees',
                     attributes: ['id', 'username', 'role'],
-                    through: { attributes: ['joinDate'] }
+                    through: { attributes: ['startDate', 'endDate'] }
                 }
             ],
             order: [['createdAt', 'DESC']]
@@ -114,13 +114,18 @@ const createTicket = async (req, res) => {
 
         if (assignees && Array.isArray(assignees)) {
             for (const a of assignees) {
-                if (typeof a === 'object' && a.joinDate) {
-                    const joinDate = new Date(a.joinDate);
-                    if (startDate && joinDate < new Date(startDate)) {
-                        return res.status(400).json({ message: `Assignee join date cannot be earlier than ticket start date` });
+                if (typeof a === 'object') {
+                    const mStartDate = a.startDate ? new Date(a.startDate) : null;
+                    const mEndDate = a.endDate ? new Date(a.endDate) : null;
+
+                    if (mStartDate && startDate && mStartDate < new Date(startDate)) {
+                        return res.status(400).json({ message: `Assignee start date cannot be earlier than ticket start date` });
                     }
-                    if (endDate && joinDate > new Date(endDate)) {
-                        return res.status(400).json({ message: `Assignee join date cannot be later than ticket end date` });
+                    if (mEndDate && endDate && mEndDate > new Date(endDate)) {
+                        return res.status(400).json({ message: `Assignee due date cannot be later than ticket due date` });
+                    }
+                    if (mStartDate && mEndDate && mEndDate < mStartDate) {
+                        return res.status(400).json({ message: `Assignee due date cannot be earlier than assignee start date` });
                     }
                 }
             }
@@ -148,13 +153,17 @@ const createTicket = async (req, res) => {
         if (assignees && Array.isArray(assignees)) {
             const assigneeAssociations = assignees.map(a => {
                 const userId = typeof a === 'object' ? a.id : a;
-                let joinDate = typeof a === 'object' ? a.joinDate : null;
-                if (joinDate === "" || joinDate === "Invalid date") joinDate = null;
+                let mStartDate = (typeof a === 'object' && a.startDate) ? a.startDate : null;
+                let mEndDate = (typeof a === 'object' && a.endDate) ? a.endDate : null;
+
+                if (mStartDate === "" || mStartDate === "Invalid date") mStartDate = null;
+                if (mEndDate === "" || mEndDate === "Invalid date") mEndDate = null;
 
                 return {
                     ticketId: ticket.id,
                     userId,
-                    joinDate
+                    startDate: mStartDate,
+                    endDate: mEndDate
                 };
             });
             await TicketAssignee.bulkCreate(assigneeAssociations);
@@ -176,7 +185,7 @@ const createTicket = async (req, res) => {
         const fullTicket = await Ticket.findByPk(ticket.id, {
             include: [
                 { model: Project, as: 'project', attributes: ['id', 'name'] },
-                { model: User, as: 'assignees', attributes: ['id', 'username', 'role'], through: { attributes: ['joinDate'] } }
+                { model: User, as: 'assignees', attributes: ['id', 'username', 'role'], through: { attributes: ['startDate', 'endDate'] } }
             ]
         });
 
@@ -240,13 +249,18 @@ const updateTicket = async (req, res) => {
 
         if (assignees && Array.isArray(assignees)) {
             for (const a of assignees) {
-                if (typeof a === 'object' && a.joinDate) {
-                    const joinDate = new Date(a.joinDate);
-                    if (startDate && joinDate < new Date(startDate)) {
-                        return res.status(400).json({ message: `Assignee join date cannot be earlier than ticket start date` });
+                if (typeof a === 'object') {
+                    const mStartDate = a.startDate ? new Date(a.startDate) : null;
+                    const mEndDate = a.endDate ? new Date(a.endDate) : null;
+
+                    if (mStartDate && startDate && mStartDate < new Date(startDate)) {
+                        return res.status(400).json({ message: `Assignee start date cannot be earlier than ticket start date` });
                     }
-                    if (endDate && joinDate > new Date(endDate)) {
-                        return res.status(400).json({ message: `Assignee join date cannot be later than ticket end date` });
+                    if (mEndDate && endDate && mEndDate > new Date(endDate)) {
+                        return res.status(400).json({ message: `Assignee due date cannot be later than ticket due date` });
+                    }
+                    if (mStartDate && mEndDate && mEndDate < mStartDate) {
+                        return res.status(400).json({ message: `Assignee due date cannot be earlier than assignee start date` });
                     }
                 }
             }
@@ -283,13 +297,17 @@ const updateTicket = async (req, res) => {
             await TicketAssignee.destroy({ where: { ticketId: id } });
             const assigneeAssociations = assignees.map(a => {
                 const userId = typeof a === 'object' ? a.id : a;
-                let joinDate = typeof a === 'object' ? a.joinDate : null;
-                if (joinDate === "" || joinDate === "Invalid date") joinDate = null;
+                let mStartDate = (typeof a === 'object' && a.startDate) ? a.startDate : null;
+                let mEndDate = (typeof a === 'object' && a.endDate) ? a.endDate : null;
+
+                if (mStartDate === "" || mStartDate === "Invalid date") mStartDate = null;
+                if (mEndDate === "" || mEndDate === "Invalid date") mEndDate = null;
 
                 return {
                     ticketId: id,
                     userId,
-                    joinDate
+                    startDate: mStartDate,
+                    endDate: mEndDate
                 };
             });
             await TicketAssignee.bulkCreate(assigneeAssociations);
@@ -315,7 +333,7 @@ const updateTicket = async (req, res) => {
         const fullTicket = await Ticket.findByPk(id, {
             include: [
                 { model: Project, as: 'project', attributes: ['id', 'name'] },
-                { model: User, as: 'assignees', attributes: ['id', 'username', 'role'], through: { attributes: ['joinDate'] } }
+                { model: User, as: 'assignees', attributes: ['id', 'username', 'role'], through: { attributes: ['startDate', 'endDate'] } }
             ]
         });
 
@@ -345,7 +363,7 @@ const getTicketById = async (req, res) => {
         const ticket = await Ticket.findByPk(id, {
             include: [
                 { model: Project, as: 'project', attributes: ['id', 'name'] },
-                { model: User, as: 'assignees', attributes: ['id', 'username', 'role'], through: { attributes: ['joinDate'] } }
+                { model: User, as: 'assignees', attributes: ['id', 'username', 'role'], through: { attributes: ['startDate', 'endDate'] } }
             ]
         });
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
@@ -407,7 +425,7 @@ const extendTicketDueDate = async (req, res) => {
         const ticket = await Ticket.findByPk(id, {
             include: [
                 { model: Project, as: 'project', attributes: ['id', 'name'] },
-                { model: User, as: 'assignees', attributes: ['id', 'username', 'role'], through: { attributes: ['joinDate'] } }
+                { model: User, as: 'assignees', attributes: ['id', 'username', 'role'], through: { attributes: ['startDate', 'endDate'] } }
             ]
         });
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });

@@ -58,7 +58,7 @@
     --jira-surface: #FFFFFF;
     --jira-surface-raised: #FFFFFF;
     --jira-surface-overlay: #FFFFFF;
-    --jira-border: #DFE1E6;
+    --jira-border: #A5ADBA;
     --jira-border-subtle: #EBECF0;
 
     --jira-text-primary: #172B4D;
@@ -421,12 +421,12 @@
   }
 
   .premium-input {
-    @apply w-full px-3 py-2 border border-[#DFE1E6] rounded-[3px] bg-white text-[14px] font-medium transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-[#4C9AFF] focus:border-[#4C9AFF] placeholder:text-[#6B778C]/50;
+    @apply w-full px-3 h-[40px] border border-[#A5ADBA] rounded-[3px] bg-white text-[14px] font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#4C9AFF]/20 focus:border-[#4C9AFF] placeholder:text-[#6B778C]/50;
     color: #172B4D;
   }
 
   .premium-input-sm {
-    @apply w-full px-2 py-1 border border-[#DFE1E6] rounded-[2px] bg-white text-[13px] font-medium transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-[#4C9AFF] focus:border-[#4C9AFF] placeholder:text-[#6B778C]/50;
+    @apply w-full px-2 h-[34px] border border-[#A5ADBA] rounded-[2px] bg-white text-[13px] font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#4C9AFF]/20 focus:border-[#4C9AFF] placeholder:text-[#6B778C]/50;
   }
 
   .premium-label {
@@ -461,7 +461,7 @@
   }
 
   .premium-select {
-    @apply w-full px-3 py-2 border border-[#DFE1E6] rounded-[3px] bg-white text-[14px] font-medium transition-all duration-200 appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#4C9AFF] focus:border-[#4C9AFF];
+    @apply w-full px-3 h-[40px] border border-[#A5ADBA] rounded-[3px] bg-white text-[14px] font-medium transition-all duration-200 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#4C9AFF]/20 focus:border-[#4C9AFF];
     color: #172B4D;
   }
 }
