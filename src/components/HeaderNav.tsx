@@ -323,9 +323,9 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-40 w-full border-b border-[var(--jira-border)] h-14" style={{ backgroundColor: 'var(--jira-surface)' }}>
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 h-full">
-          <div className="flex items-center justify-between h-full">
+      <header className="fixed top-0 left-0 right-0 z-40 w-full border-b border-[var(--jira-border)] h-auto min-h-[3.5rem]" style={{ backgroundColor: 'var(--jira-surface)' }}>
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-3 cursor-pointer group" onClick={() => navigate("/")}>
                 <div className="w-8 h-8 rounded-[3px] bg-[#0052CC] flex items-center justify-center shadow-sm">
@@ -334,7 +334,7 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
                 <span className="font-bold text-lg text-[#172B4D] tracking-tight">Track Flow</span>
               </div>
               {!hideLinks && (
-                <nav className="hidden md:flex items-center h-full gap-2">
+                <nav className="hidden md:flex items-center h-14 gap-2">
                   {navItems.map(item => {
                     const isActive = location.pathname.startsWith(item.url);
                     return (
@@ -381,10 +381,10 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
             </div>
           </div>
           {!hideLinks && (
-            <nav className="md:hidden flex items-center gap-1 pb-2 overflow-x-auto scrollbar-hide">
+            <nav className="md:hidden flex items-center justify-start gap-1.5 py-2.5 overflow-x-auto scrollbar-hide">
               {navItems.map(item => (
                 <NavLink key={item.url} to={item.url} end={item.url === "/"}
-                  className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-[#42526E] hover:text-[#172B4D] hover:bg-[#F4F5F7] rounded-[3px] transition-all whitespace-nowrap"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-[#42526E] hover:text-[#172B4D] hover:bg-[#F4F5F7] rounded-[3px] transition-all whitespace-nowrap"
                   activeClassName="!text-[#0052CC] !bg-[#0052CC]/10">
                   <span>{item.title}</span>
                 </NavLink>

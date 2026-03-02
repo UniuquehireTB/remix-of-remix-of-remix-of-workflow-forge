@@ -186,8 +186,12 @@ export const ticketService = {
     delete: async (id: number) => {
         return apiService.delete(`/tickets/${id}`);
     },
-    getStats: async (projectId: any) => {
-        return apiService.get(`/tickets/stats?projectId=${projectId}`);
+    getStats: async (params: { projectId?: any, assigneeId?: any, startDate?: string, endDate?: string, type?: string, priority?: string }) => {
+        const filteredParams = Object.fromEntries(
+            Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== 'All')
+        );
+        const query = new URLSearchParams(filteredParams as any).toString();
+        return apiService.get(`/tickets/stats?${query}`);
     },
     extendDueDate: async (id: number, data: { endDate: string, reason: string }) => {
         return apiService.put(`/tickets/${id}/extend-due-date`, data);
@@ -242,4 +246,3 @@ export const notificationService = {
         return apiService.delete(`/notifications/${id}`);
     }
 };
-

@@ -208,7 +208,7 @@ export function TicketSidebarForm({
                             </p>
 
                             <FormField
-                                label="Space"
+                                label="Project"
                                 labelClassName="text-[#44546F] font-semibold text-[13px]"
                             >
                                 <AnimatedDropdown

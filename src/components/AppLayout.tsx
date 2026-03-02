@@ -16,7 +16,7 @@ export function AppLayout({ children, title, subtitle, hideNav = false, hideLink
       {!hideNav && <HeaderNav hideLinks={hideLinks} />}
       <main className={cn(
         "flex-1 flex flex-col min-h-0",
-        !centerContent && "pt-16",
+        !centerContent && "pt-[104px] md:pt-14",
         centerContent && "items-center justify-center p-0"
       )}>
         {children}

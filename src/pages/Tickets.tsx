@@ -249,14 +249,21 @@ const Tickets = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const data = await ticketService.getStats(projectFilter);
+        const data = await ticketService.getStats({
+          projectId: projectFilter,
+          assigneeId: employeeFilter,
+          startDate: startDateFilter || undefined,
+          endDate: endDateFilter || undefined,
+          type: typeFilter,
+          priority: priorityFilter
+        });
         setStats(data);
       } catch (err) {
         console.error("Failed to fetch ticket stats", err);
       }
     }
     fetchStats();
-  }, [projectFilter, tickets.length, refreshTrigger]); // Also refresh stats if tickets list changes or refresh is triggered
+  }, [projectFilter, employeeFilter, startDateFilter, endDateFilter, typeFilter, priorityFilter, tickets.length, refreshTrigger]); // Also refresh stats if tickets list changes or refresh is triggered
 
   useEffect(() => {
     if (refreshTrigger > 0) {

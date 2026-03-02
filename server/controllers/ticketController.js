@@ -375,15 +375,56 @@ const getTicketById = async (req, res) => {
 
 const getTicketStatsByProject = async (req, res) => {
     try {
-        const { projectId } = req.query;
-        if (!projectId) return res.status(400).json({ message: 'Project ID is required' });
+        const { projectId, assigneeId, startDate, endDate, type, priority } = req.query;
 
         const whereClause = {
             isActive: true,
-            ...(projectId && projectId !== 'All' && {
+            ...(projectId && projectId !== 'undefined' && projectId !== 'All' && {
                 projectId: projectId === 'null' ? null : projectId
-            })
+            }),
+            ...(type && { type }),
+            ...(priority && { priority })
         };
+
+        if (startDate && startDate !== 'null') {
+            const sDate = new Date(startDate);
+            if (!isNaN(sDate.getTime())) {
+                whereClause.startDate = { [Op.gte]: sDate };
+            }
+        }
+        if (endDate && endDate !== 'null') {
+            const eDate = new Date(endDate);
+            if (!isNaN(eDate.getTime())) {
+                whereClause.endDate = { [Op.lte]: eDate };
+            }
+        }
+
+        const elevatedRoles = ['Architect', 'Manager', 'System Architect', 'Technical Analyst'];
+        if (!elevatedRoles.includes(req.user.role)) {
+            const userProjectIds = await ProjectMember.findAll({
+                where: { userId: req.user.id },
+                attributes: ['projectId']
+            });
+            const projectIds = userProjectIds.map(pm => pm.projectId).filter(id => id != null);
+
+            whereClause[Op.and] = [
+                {
+                    [Op.or]: [
+                        { projectId: { [Op.in]: projectIds } },
+                        { projectId: null }
+                    ]
+                }
+            ];
+        }
+
+        if (assigneeId && assigneeId !== 'All') {
+            const ticketAssignees = await TicketAssignee.findAll({
+                where: { userId: assigneeId },
+                attributes: ['ticketId']
+            });
+            const ticketIds = ticketAssignees.map(ta => ta.ticketId);
+            whereClause.id = { [Op.in]: ticketIds };
+        }
 
         const stats = await Ticket.findAll({
             where: whereClause,
