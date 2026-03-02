@@ -31,7 +31,8 @@ const TicketDraftContext = createContext<TicketDraftContextType | undefined>(und
 
 const emptyTicket = () => ({
     title: "", description: "", type: "", priority: "",
-    projectId: null, startDate: "", endDate: "", assignees: []
+    projectId: null, startDate: "", endDate: "", assignees: [],
+    extendReason: ""
 });
 
 export const TicketDraftProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -216,7 +217,8 @@ export const TicketDraftProvider: React.FC<{ children: React.ReactNode }> = ({ c
                     const id = typeof a === 'object' ? a.id : a;
                     const mStart = (typeof a === 'object' && a.startDate) ? a.startDate : null;
                     return { id, startDate: mStart, endDate: null };
-                })
+                }),
+                extendReason: editData.extendReason
             };
 
             if (editingId) {
