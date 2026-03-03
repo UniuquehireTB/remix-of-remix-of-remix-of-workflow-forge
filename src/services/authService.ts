@@ -72,16 +72,20 @@ export const apiService = {
 
         // Still 401 after retry → give up
         if (response.status === 401) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            if (window.location.pathname !== '/login') {
-                window.location.href = '/login';
+            if (isAuthEndpoint) {
+                throw new Error(data?.message || 'Authentication failed');
+            } else {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                if (window.location.pathname !== '/login') {
+                    window.location.href = '/login';
+                }
+                throw new Error('Session expired. Please login again.');
             }
-            throw new Error('Session expired. Please login again.');
         }
 
         if (!response.ok) {
-            throw new Error(data.message || 'Request failed');
+            throw new Error(data?.message || 'Request failed');
         }
 
         return data;

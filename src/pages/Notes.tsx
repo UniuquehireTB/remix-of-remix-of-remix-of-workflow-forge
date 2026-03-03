@@ -711,7 +711,7 @@ const Notes = () => {
 
                     <div className="flex-1 overflow-y-auto premium-scrollbar flex flex-col min-h-0 bg-white">
                       <div className="p-6 space-y-5">
-                        {!isEditing && (
+                        {canEdit && !isEditing && (
                           <div className="flex items-center gap-3 p-3 rounded-[3px] bg-[#F4F5F7] border border-[#EBECF0] text-[#172B4D]">
                             <Shield className="w-3.5 h-3.5 text-[#6B778C]" />
                             <span className="text-[12px] font-medium">Read-only mode. Click the pencil icon to edit.</span>

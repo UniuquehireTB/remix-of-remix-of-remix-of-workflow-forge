@@ -197,7 +197,7 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
   const pendingInvitesCount = invitations.length;
-  const totalBadgeCount = unreadCount + pendingInvitesCount;
+  const totalBadgeCount = hideLinks ? pendingInvitesCount : unreadCount + pendingInvitesCount;
 
   const handleMarkAllRead = async () => {
     try {
@@ -393,7 +393,7 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-6">
-              <div className="flex items-center gap-3 cursor-pointer group" onClick={() => navigate("/")}>
+              <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-[3px] bg-[#0052CC] flex items-center justify-center shadow-sm">
                   <div className="w-4 h-4 border-2 border-white rounded-[1px]" />
                 </div>
@@ -425,15 +425,19 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
               )}
             </div>
             <div className="flex items-center gap-3">
-              {!hideLinks && (
-                <button onClick={() => { setNotifOpen(true); setProfileOpen(false); }}
-                  className="relative w-8 h-8 rounded-full flex items-center justify-center text-[#42526E] hover:bg-[#F4F5F7] hover:text-[#172B4D] transition-all duration-200">
-                  <Bell className="w-4.5 h-4.5" />
-                  {totalBadgeCount > 0 && (
-                    <span className="absolute top-0 right-0 w-4 h-4 bg-[#DE350B] text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-white">{totalBadgeCount}</span>
-                  )}
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  if (hideLinks) setNotifTab('invitations');
+                  setNotifOpen(true);
+                  setProfileOpen(false);
+                }}
+                className="relative w-8 h-8 rounded-full flex items-center justify-center text-[#42526E] hover:bg-[#F4F5F7] hover:text-[#172B4D] transition-all duration-200"
+              >
+                <Bell className="w-4.5 h-4.5" />
+                {totalBadgeCount > 0 && (
+                  <span className="absolute top-0 right-0 w-4 h-4 bg-[#DE350B] text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-white">{totalBadgeCount}</span>
+                )}
+              </button>
               <button onClick={() => { setProfileOpen(true); setNotifOpen(false); }}
                 className="w-8 h-8 rounded-full bg-[#0052CC] flex items-center justify-center text-white hover:bg-[#0747A6] transition-all duration-200 overflow-hidden shadow-sm">
                 {currentUser?.username ? (
@@ -479,21 +483,23 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
               <div className="flex items-center justify-between mb-5">
                 <h2 className="text-[20px] font-medium text-[#172B4D]">Notifications</h2>
                 <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[12px] text-[#42526E]">Only show unread</span>
-                    <button
-                      onClick={() => setShowOnlyUnread(!showOnlyUnread)}
-                      className={cn(
-                        "w-9 h-5 rounded-full relative transition-colors duration-200 shrink-0",
-                        showOnlyUnread ? "bg-[#0052CC]" : "bg-[#6B778C]/40"
-                      )}
-                    >
-                      <div className={cn(
-                        "absolute top-1 w-3 h-3 bg-white rounded-full transition-all duration-200 shadow-sm",
-                        showOnlyUnread ? "left-5" : "left-1"
-                      )} />
-                    </button>
-                  </div>
+                  {!hideLinks && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[12px] text-[#42526E]">Only show unread</span>
+                      <button
+                        onClick={() => setShowOnlyUnread(!showOnlyUnread)}
+                        className={cn(
+                          "w-9 h-5 rounded-full relative transition-colors duration-200 shrink-0",
+                          showOnlyUnread ? "bg-[#0052CC]" : "bg-[#6B778C]/40"
+                        )}
+                      >
+                        <div className={cn(
+                          "absolute top-1 w-3 h-3 bg-white rounded-full transition-all duration-200 shadow-sm",
+                          showOnlyUnread ? "left-5" : "left-1"
+                        )} />
+                      </button>
+                    </div>
+                  )}
                   <button onClick={() => setNotifOpen(false)} className="text-[#42525E] hover:text-[#172B4D] transition-colors">
                     <X className="w-5 h-5" />
                   </button>
@@ -502,14 +508,16 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
 
               {/* Tabs */}
               <div className="flex items-center gap-6 border-b border-[#DFE1E6]">
-                <button
-                  onClick={() => setNotifTab('notifications')}
-                  className={cn("pb-2 text-[12px] font-bold relative transition-colors", notifTab === 'notifications' ? "text-[#0052CC]" : "text-[#6B778C] hover:text-[#172B4D]")}
-                >
-                  Notifications
-                  {unreadCount > 0 && <span className="ml-1.5 px-1.5 py-0.5 bg-[#DE350B] text-white text-[9px] font-bold rounded-full">{unreadCount}</span>}
-                  {notifTab === 'notifications' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#0052CC]" />}
-                </button>
+                {!hideLinks && (
+                  <button
+                    onClick={() => setNotifTab('notifications')}
+                    className={cn("pb-2 text-[12px] font-bold relative transition-colors", notifTab === 'notifications' ? "text-[#0052CC]" : "text-[#6B778C] hover:text-[#172B4D]")}
+                  >
+                    Notifications
+                    {unreadCount > 0 && <span className="ml-1.5 px-1.5 py-0.5 bg-[#DE350B] text-white text-[9px] font-bold rounded-full">{unreadCount}</span>}
+                    {notifTab === 'notifications' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#0052CC]" />}
+                  </button>
+                )}
                 <button
                   onClick={() => setNotifTab('invitations')}
                   className={cn("pb-2 text-[12px] font-bold relative transition-colors", notifTab === 'invitations' ? "text-[#0052CC]" : "text-[#6B778C] hover:text-[#172B4D]")}
