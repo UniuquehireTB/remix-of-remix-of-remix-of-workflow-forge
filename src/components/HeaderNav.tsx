@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
-import { Bell, User, Moon, Sun, LogOut, FolderKanban, Bug, FileText, X, Rocket, UserPlus, Mail, Lock, Eye, EyeOff, Shield, ArrowRight, Pencil, ChevronLeft, Users, ExternalLink, MoreHorizontal, LifeBuoy } from "lucide-react";
+import { Bell, User, Moon, Sun, LogOut, FolderKanban, Bug, FileText, X, Rocket, UserPlus, Mail, Lock, Eye, EyeOff, Shield, ArrowRight, Pencil, ChevronLeft, Users, ExternalLink, MoreHorizontal, LifeBuoy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AnimatedDropdown } from "@/components/AnimatedDropdown";
 import { useToast } from "@/hooks/use-toast";
-import { authService, notificationService } from "@/services/authService";
+import { authService, notificationService, invitationService } from "@/services/authService";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 
@@ -25,6 +25,19 @@ interface NotificationData {
   targetId: number | null;
   isRead: boolean;
   createdAt: string;
+  sender?: {
+    id: number;
+    username: string;
+  };
+}
+
+interface InvitationData {
+  id: number;
+  projectId: number;
+  status: string;
+  createdAt: string;
+  project: { id: number; name: string; client: string; projectCode: string };
+  inviter: { id: number; username: string; role: string };
 }
 
 const roles = ["Architect", "Manager", "Technical Analyst", "Senior Developer", "Developer"];
@@ -33,6 +46,9 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [signupOpen, setSignupOpen] = useState(false);
+  const [notifTab, setNotifTab] = useState<'notifications' | 'invitations'>('notifications');
+  const [invitations, setInvitations] = useState<InvitationData[]>([]);
+  const [inviteLoadingId, setInviteLoadingId] = useState<number | null>(null);
   const [darkMode, setDarkMode] = useState(() => {
     // Read persisted preference on first render
     const saved = localStorage.getItem('theme');
@@ -162,7 +178,11 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
   useEffect(() => {
     if (currentUser) {
       fetchNotifications();
-      const interval = setInterval(fetchNotifications, 30000);
+      fetchInvitations();
+      const interval = setInterval(() => {
+        fetchNotifications();
+        fetchInvitations();
+      }, 30000);
       return () => clearInterval(interval);
     }
   }, [currentUser?.id]);
@@ -176,6 +196,8 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
   }, [profileOpen]);
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
+  const pendingInvitesCount = invitations.length;
+  const totalBadgeCount = unreadCount + pendingInvitesCount;
 
   const handleMarkAllRead = async () => {
     try {
@@ -183,6 +205,45 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
     } catch (err) {
       toast({ title: "Error", description: "Failed to mark all as read", variant: "destructive" });
+    }
+  };
+
+  const handleClearAll = async () => {
+    try {
+      await notificationService.clearAll();
+      setNotifications([]);
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to clear notifications", variant: "destructive" });
+    }
+  };
+
+  const fetchInvitations = async () => {
+    try {
+      const data = await invitationService.getPending();
+      setInvitations(data);
+    } catch (err) {
+      console.error('Failed to load invitations', err);
+    }
+  };
+
+  const handleInviteRespond = async (invitationId: number, action: 'accept' | 'decline') => {
+    setInviteLoadingId(invitationId);
+    try {
+      await invitationService.respond(invitationId, action);
+      setInvitations(prev => prev.filter(i => i.id !== invitationId));
+      toast({
+        title: action === 'accept' ? '✅ Joined Project' : '❌ Invitation Declined',
+        description: action === 'accept' ? 'You are now a member of the project.' : 'Invitation declined.',
+        variant: action === 'accept' ? 'success' : 'default'
+      });
+      // On accept: tell the Projects page to refresh so the new project appears immediately
+      if (action === 'accept') {
+        window.dispatchEvent(new CustomEvent('projects:refresh'));
+      }
+    } catch (err) {
+      toast({ title: 'Error', description: 'Failed to respond to invitation.', variant: 'destructive' });
+    } finally {
+      setInviteLoadingId(null);
     }
   };
 
@@ -207,6 +268,11 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
     // Mark as read if unread
     if (!n.isRead) {
       await handleMarkAsRead(n.id);
+    }
+    // If it's a project invite notification → switch to Invitations tab
+    if (n.type === 'project_invite') {
+      setNotifTab('invitations');
+      return;
     }
     // Navigate based on type
     const route = getNotificationRoute(n.type);
@@ -363,8 +429,8 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
                 <button onClick={() => { setNotifOpen(true); setProfileOpen(false); }}
                   className="relative w-8 h-8 rounded-full flex items-center justify-center text-[#42526E] hover:bg-[#F4F5F7] hover:text-[#172B4D] transition-all duration-200">
                   <Bell className="w-4.5 h-4.5" />
-                  {unreadCount > 0 && (
-                    <span className="absolute top-0 right-0 w-4 h-4 bg-[#DE350B] text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-white">{unreadCount}</span>
+                  {totalBadgeCount > 0 && (
+                    <span className="absolute top-0 right-0 w-4 h-4 bg-[#DE350B] text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-white">{totalBadgeCount}</span>
                   )}
                 </button>
               )}
@@ -436,63 +502,179 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
 
               {/* Tabs */}
               <div className="flex items-center gap-6 border-b border-[#DFE1E6]">
-                <div className="pb-2 text-[12px] font-bold text-[#0052CC] relative">
-                  Direct
-                  <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#0052CC]" />
-                </div>
+                <button
+                  onClick={() => setNotifTab('notifications')}
+                  className={cn("pb-2 text-[12px] font-bold relative transition-colors", notifTab === 'notifications' ? "text-[#0052CC]" : "text-[#6B778C] hover:text-[#172B4D]")}
+                >
+                  Notifications
+                  {unreadCount > 0 && <span className="ml-1.5 px-1.5 py-0.5 bg-[#DE350B] text-white text-[9px] font-bold rounded-full">{unreadCount}</span>}
+                  {notifTab === 'notifications' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#0052CC]" />}
+                </button>
+                <button
+                  onClick={() => setNotifTab('invitations')}
+                  className={cn("pb-2 text-[12px] font-bold relative transition-colors", notifTab === 'invitations' ? "text-[#0052CC]" : "text-[#6B778C] hover:text-[#172B4D]")}
+                >
+                  Invitations
+                  {pendingInvitesCount > 0 && <span className="ml-1.5 px-1.5 py-0.5 bg-[#0052CC] text-white text-[9px] font-bold rounded-full">{pendingInvitesCount}</span>}
+                  {notifTab === 'invitations' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#0052CC]" />}
+                </button>
               </div>
             </div>
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto px-6 py-4 premium-scrollbar">
-              {notifications.length > 0 && (
-                <div className="text-[10px] font-bold text-[#6B778C] uppercase tracking-wider mb-4">Today</div>
+
+              {/* ── NOTIFICATIONS TAB ── */}
+              {notifTab === 'notifications' && (
+                <>
+                  {notifications.length > 0 && (
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="text-[10px] font-bold text-[#6B778C] uppercase tracking-wider">Today</div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={handleMarkAllRead}
+                          disabled={unreadCount === 0}
+                          className="text-[12px] font-medium text-[#0052CC] hover:underline disabled:opacity-50 disabled:hover:no-underline transition-all"
+                        >
+                          Mark all as read
+                        </button>
+                        <button
+                          onClick={handleClearAll}
+                          className="text-[12px] font-medium text-[#42526E] hover:text-[#DE350B] hover:underline transition-colors"
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {notifications.filter(n => !showOnlyUnread || !n.isRead).length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-center">
+                      <div className="w-16 h-16 mb-4 flex items-center justify-center">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M5 21V3H14L14.5 5H20V15H13L12.5 13H7V21H5Z" fill="#FFC400" stroke="#FFC400" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          <rect x="15" y="11" width="6" height="6" rx="1" fill="#0052CC" />
+                        </svg>
+                      </div>
+                      <p className="text-[16px] text-[#172B4D] mb-1">That's all your notifications from</p>
+                      <p className="text-[16px] text-[#172B4D]">the last 30 days.</p>
+                    </div>
+                  ) : notifications.filter(n => !showOnlyUnread || !n.isRead).map((n, i) => {
+                    const avatarLetter = n.sender?.username
+                      ? n.sender.username.charAt(0).toUpperCase()
+                      : (n.message ? n.message.charAt(0).toUpperCase() : 'S');
+
+                    const isSenderMessage = n.sender?.username && n.message.startsWith(n.sender.username);
+                    const isSystemEntityMessage = n.message.startsWith('Ticket') || n.message.startsWith('Project');
+
+                    return (
+                      <div
+                        key={n.id}
+                        id={`notif-${i}`}
+                        onClick={() => handleNotificationClick(n)}
+                        className={cn(
+                          "flex items-start gap-4 py-3 cursor-pointer group -mx-6 px-6 transition-colors",
+                          activeIndex === i ? "bg-[#F4F5F7] border-l-2 border-[#0052CC] pl-[22px]" : "hover:bg-[#F4F5F7]",
+                          !n.isRead && activeIndex !== i ? "bg-[#DEEBFF]/10" : ""
+                        )}
+                      >
+                        <div className="w-10 h-10 rounded-full bg-[#E54937] shrink-0 flex items-center justify-center text-white font-bold text-[14px]">
+                          {avatarLetter}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-[13px] text-[#172B4D] leading-snug">
+                              {isSenderMessage ? (
+                                <>
+                                  <span className="font-bold">{n.sender!.username}</span>
+                                  {n.message.substring(n.sender!.username.length)}
+                                </>
+                              ) : isSystemEntityMessage ? (
+                                <>
+                                  <span className="font-bold">{n.message.split(' ')[0]} {n.message.split(' ')[1]}</span>
+                                  {' '}{n.message.split(' ').slice(2).join(' ')}
+                                </>
+                              ) : (
+                                n.message
+                              )}
+                            </span>
+                            <span className="text-[13px] text-[#6B778C] shrink-0">
+                              {formatDistanceToNow(new Date(n.createdAt), { addSuffix: false })} ago
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <LifeBuoy className="w-3.5 h-3.5 text-[#0052CC]" />
+                            <span className="text-[11px] text-[#42526E]">Rivo App</span>
+                          </div>
+                        </div>
+                        {!n.isRead && (
+                          <div className="w-2 h-2 rounded-full bg-[#0052CC] mt-2.5 shrink-0" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
               )}
 
-              {notifications.filter(n => !showOnlyUnread || !n.isRead).length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 text-center">
-                  <div className="w-16 h-16 mb-4 flex items-center justify-center">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M5 21V3H14L14.5 5H20V15H13L12.5 13H7V21H5Z" fill="#FFC400" stroke="#FFC400" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      <rect x="15" y="11" width="6" height="6" rx="1" fill="#0052CC" />
-                    </svg>
-                  </div>
-                  <p className="text-[16px] text-[#172B4D] mb-1">That's all your notifications from</p>
-                  <p className="text-[16px] text-[#172B4D]">the last 30 days.</p>
-                </div>
-              ) : notifications.filter(n => !showOnlyUnread || !n.isRead).map((n, i) => (
-                <div
-                  key={n.id}
-                  id={`notif-${i}`}
-                  onClick={() => handleNotificationClick(n)}
-                  className={cn(
-                    "flex items-start gap-4 py-3 cursor-pointer group -mx-6 px-6 transition-colors",
-                    activeIndex === i ? "bg-[#F4F5F7] border-l-2 border-[#0052CC] pl-[22px]" : "hover:bg-[#F4F5F7]",
-                    !n.isRead && activeIndex !== i ? "bg-[#DEEBFF]/10" : ""
-                  )}
-                >
-                  <div className="w-10 h-10 rounded-full bg-[#E54937] shrink-0 flex items-center justify-center text-white font-bold text-[14px]">
-                    {n.message.includes('added') ? 'S' : (currentUser?.username?.charAt(0).toUpperCase() || 'U')}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-[13px] text-[#172B4D]">
-                        <span className="font-bold">n.syedraja</span> {n.message}
-                      </span>
-                      <span className="text-[13px] text-[#6B778C] shrink-0">
-                        {formatDistanceToNow(new Date(n.createdAt), { addSuffix: false })} ago
-                      </span>
+              {/* ── INVITATIONS TAB ── */}
+              {notifTab === 'invitations' && (
+                <>
+                  {invitations.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-center">
+                      <div className="w-14 h-14 mb-4 rounded-full bg-[#F4F5F7] flex items-center justify-center">
+                        <Mail className="w-6 h-6 text-[#6B778C]" />
+                      </div>
+                      <p className="text-[15px] font-bold text-[#172B4D] mb-1">No pending invitations</p>
+                      <p className="text-[13px] text-[#6B778C]">You're all caught up!</p>
                     </div>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <LifeBuoy className="w-3.5 h-3.5 text-[#0052CC]" />
-                      <span className="text-[11px] text-[#42526E]">Rivo App</span>
+                  ) : (
+                    <div className="space-y-3">
+                      {invitations.map(inv => (
+                        <motion.div
+                          key={inv.id}
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          className="p-4 rounded-[6px] border border-[#B3D4FF] bg-[#DEEBFF]/40 space-y-3"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="w-9 h-9 rounded-[6px] bg-[#0052CC] flex items-center justify-center text-white font-bold text-[14px] shrink-0">
+                              {inv.project.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[13px] font-bold text-[#172B4D] truncate">{inv.project.name}</p>
+                              <p className="text-[11px] text-[#6B778C] font-medium">{inv.project.client}</p>
+                              <p className="text-[11px] text-[#42526E] mt-0.5">
+                                Invited by <span className="font-bold">{inv.inviter.username}</span> · {formatDistanceToNow(new Date(inv.createdAt), { addSuffix: true })}
+                              </p>
+                            </div>
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-[2px] border border-[#B3D4FF] bg-white text-[#0052CC] shrink-0">
+                              {inv.project.projectCode}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              disabled={inviteLoadingId === inv.id}
+                              onClick={() => handleInviteRespond(inv.id, 'accept')}
+                              className="flex-1 h-8 rounded-[3px] bg-[#0052CC] hover:bg-[#0747A6] text-white text-[12px] font-bold transition-all disabled:opacity-60 flex items-center justify-center gap-1.5"
+                            >
+                              {inviteLoadingId === inv.id ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                              Accept
+                            </button>
+                            <button
+                              disabled={inviteLoadingId === inv.id}
+                              onClick={() => handleInviteRespond(inv.id, 'decline')}
+                              className="flex-1 h-8 rounded-[3px] bg-white border border-[#DFE1E6] hover:bg-[#FFEBE6] hover:border-[#FF8F73] hover:text-[#DE350B] text-[#42526E] text-[12px] font-bold transition-all disabled:opacity-60 flex items-center justify-center gap-1.5"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              Decline
+                            </button>
+                          </div>
+                        </motion.div>
+                      ))}
                     </div>
-                  </div>
-                  {!n.isRead && (
-                    <div className="w-2 h-2 rounded-full bg-[#0052CC] mt-2.5 shrink-0" />
                   )}
-                </div>
-              ))}
+                </>
+              )}
             </div>
 
             {/* Footer */}

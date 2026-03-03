@@ -52,6 +52,17 @@ const deleteNotification = async (req, res) => {
     }
 };
 
+const deleteAllNotifications = async (req, res) => {
+    try {
+        await Notification.update({ isActive: false }, {
+            where: { userId: req.user.id }
+        });
+        res.json({ message: 'All notifications cleared' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
 // Helper function to create notifications (to be used in other controllers)
 const createNotification = async ({ userId, senderId, title, message, type, targetId }) => {
     try {
@@ -80,5 +91,6 @@ module.exports = {
     markAsRead,
     markAllAsRead,
     deleteNotification,
+    deleteAllNotifications,
     createNotification
 };

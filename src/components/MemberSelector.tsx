@@ -275,7 +275,7 @@ export function MemberSelector({
                                                 {String(m.id) === String(currentUser?.id) ? "S" : getInitials(m.username)}
                                             </div>
                                             <span className="text-[12px] font-bold text-[#172B4D] whitespace-nowrap">
-                                                {String(m.id) === String(currentUser?.id) ? "Sam" : m.username}
+                                                {String(m.id) === String(currentUser?.id) ? currentUser?.username : m.username}
                                             </span>
 
                                             {isTickets && (

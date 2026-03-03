@@ -160,6 +160,21 @@ export const projectService = {
     },
     delete: async (id: number) => {
         return apiService.delete(`/projects/${id}`);
+    },
+    invite: async (projectId: number, userIds: number[]) => {
+        return apiService.post(`/projects/${projectId}/invite`, { userIds });
+    },
+    leave: async (projectId: number) => {
+        return apiService.post(`/projects/${projectId}/leave`, {});
+    }
+};
+
+export const invitationService = {
+    getPending: async () => {
+        return apiService.get('/invitations/pending');
+    },
+    respond: async (invitationId: number, action: 'accept' | 'decline') => {
+        return apiService.put(`/invitations/${invitationId}/respond`, { action });
     }
 };
 
@@ -241,6 +256,9 @@ export const notificationService = {
     },
     markAllRead: async () => {
         return apiService.put('/notifications/mark-all-read', {});
+    },
+    clearAll: async () => {
+        return apiService.delete('/notifications/clear-all');
     },
     delete: async (id: number) => {
         return apiService.delete(`/notifications/${id}`);

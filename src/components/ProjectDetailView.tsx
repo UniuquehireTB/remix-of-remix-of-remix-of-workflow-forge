@@ -2,7 +2,7 @@ import React from "react";
 import {
     X, FolderKanban, Building2, FileText, Users, Pencil, Trash2,
     CheckCircle2, Activity, Calendar,
-    Clock, LifeBuoy
+    Clock, LifeBuoy, LogOut
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, formatDistanceToNow } from "date-fns";
 
-import { ticketService } from "@/services/authService";
+import { ticketService, authService, projectService } from "@/services/authService";
 
 interface ProjectDetailViewProps {
     project: any;
@@ -34,6 +34,28 @@ export function ProjectDetailView({
         'Closed': 0,
         'total': 0
     });
+
+    const currentUser = authService.getCurrentUser();
+    // Only the project CREATOR can edit/delete — no role bypass
+    const isOwner = currentUser?.id === project?.createdBy;
+    const canManage = isOwner;
+    // A non-owner who is a member can leave the project
+    const isMember = !isOwner && project?.members?.some((m: any) => String(m.id) === String(currentUser?.id));
+    const [isLeaving, setIsLeaving] = React.useState(false);
+
+    const handleLeave = async () => {
+        if (!project?.id || isLeaving) return;
+        setIsLeaving(true);
+        try {
+            await projectService.leave(project.id);
+            window.dispatchEvent(new CustomEvent('projects:refresh'));
+            onClose();
+        } catch (err) {
+            console.error('Failed to leave project', err);
+        } finally {
+            setIsLeaving(false);
+        }
+    };
 
     React.useEffect(() => {
         if (project?.id) {
@@ -69,25 +91,27 @@ export function ProjectDetailView({
                     </span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[3px] hover:bg-[#F4F5F7] text-[#42526E]" onClick={() => onEdit(project)}>
-                                    <Pencil className="w-3.5 h-3.5" />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent className="text-xs bg-[#172B4D] text-white border-none py-1.5 px-2">Edit</TooltipContent>
-                        </Tooltip>
+                    {canManage && (
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[3px] hover:bg-[#F4F5F7] text-[#42526E]" onClick={() => onEdit(project)}>
+                                        <Pencil className="w-3.5 h-3.5" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent className="text-xs bg-[#172B4D] text-white border-none py-1.5 px-2">Edit</TooltipContent>
+                            </Tooltip>
 
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[3px] hover:bg-[#FFEBE6] hover:text-[#BF2600] text-[#42526E]" onClick={() => onDelete(project)}>
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent className="text-xs bg-[#172B4D] text-white border-none py-1.5 px-2">Delete</TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[3px] hover:bg-[#FFEBE6] hover:text-[#BF2600] text-[#42526E]" onClick={() => onDelete(project)}>
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent className="text-xs bg-[#172B4D] text-white border-none py-1.5 px-2">Delete</TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    )}
 
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[3px] ml-1 text-[#42526E]" onClick={onClose}>
                         <X className="w-4.5 h-4.5" />
@@ -210,14 +234,29 @@ export function ProjectDetailView({
                             </div>
                         </div>
 
-                        <div className="pt-6 border-t border-border">
-                            <Button
-                                onClick={() => onEdit(project)}
-                                className="w-full rounded-[3px] bg-white border border-border text-[#42526E] hover:bg-[#EBECF0] h-9 text-[13px] font-bold shadow-none"
-                            >
-                                Edit Project
-                            </Button>
-                        </div>
+                        {canManage && (
+                            <div className="pt-6 border-t border-border">
+                                <Button
+                                    onClick={() => onEdit(project)}
+                                    className="w-full rounded-[3px] bg-white border border-border text-[#42526E] hover:bg-[#EBECF0] h-9 text-[13px] font-bold shadow-none"
+                                >
+                                    Edit Project
+                                </Button>
+                            </div>
+                        )}
+
+                        {isMember && (
+                            <div className="pt-6 border-t border-border">
+                                <Button
+                                    onClick={handleLeave}
+                                    loading={isLeaving}
+                                    className="w-full rounded-[3px] bg-[#FFEBE6] border border-[#FF8F73]/40 text-[#DE350B] hover:bg-[#FFBDAD] h-9 text-[13px] font-bold shadow-none flex items-center justify-center gap-2"
+                                >
+                                    <LogOut className="w-3.5 h-3.5" />
+                                    Leave Project
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

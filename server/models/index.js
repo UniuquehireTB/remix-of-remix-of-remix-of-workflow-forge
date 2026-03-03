@@ -1,6 +1,7 @@
 const User = require('./User');
 const Project = require('./Project');
 const ProjectMember = require('./ProjectMember');
+const ProjectInvitation = require('./ProjectInvitation');
 const Ticket = require('./Ticket');
 const TicketAssignee = require('./TicketAssignee');
 const Note = require('./Note');
@@ -17,6 +18,16 @@ ProjectMember.belongsTo(Project, { foreignKey: 'projectId' });
 
 User.hasMany(ProjectMember, { foreignKey: 'userId' });
 ProjectMember.belongsTo(User, { foreignKey: 'userId' });
+
+// ProjectInvitation associations
+Project.hasMany(ProjectInvitation, { foreignKey: 'projectId', as: 'invitations' });
+ProjectInvitation.belongsTo(Project, { foreignKey: 'projectId', as: 'project' });
+
+User.hasMany(ProjectInvitation, { foreignKey: 'userId', as: 'receivedInvitations' });
+ProjectInvitation.belongsTo(User, { foreignKey: 'userId', as: 'invitee' });
+
+User.hasMany(ProjectInvitation, { foreignKey: 'invitedBy', as: 'sentInvitations' });
+ProjectInvitation.belongsTo(User, { foreignKey: 'invitedBy', as: 'inviter' });
 
 // Project <-> Ticket
 Project.hasMany(Ticket, { foreignKey: 'projectId', as: 'tickets' });
@@ -61,6 +72,7 @@ module.exports = {
     User,
     Project,
     ProjectMember,
+    ProjectInvitation,
     Ticket,
     TicketAssignee,
     Note,

@@ -99,6 +99,10 @@ export function TicketDetailView({
         }
     };
 
+    const isPrivileged = ["Architect", "Manager", "Technical Analyst"].includes(currentUser?.role);
+    const isCreator = Number(ticket?.userId) === Number(currentUser?.id);
+    const canManageTicket = isPrivileged || isCreator;
+
     if (!ticket) return null;
 
     const project = projects.find(p => p.id === ticket.projectId);
@@ -201,25 +205,29 @@ export function TicketDetailView({
 
                             <div className="w-px h-4 bg-border/60 mx-1" />
 
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[3px] hover:bg-[#F4F5F7] text-[#42526E]" onClick={() => onEdit(ticket)}>
-                                        <Pencil className="w-3.5 h-3.5" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent className="text-xs bg-[#172B4D] text-white border-none py-1.5 px-2">Edit</TooltipContent>
-                            </Tooltip>
+                            {canManageTicket && (
+                                <>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[3px] hover:bg-[#F4F5F7] text-[#42526E]" onClick={() => onEdit(ticket)}>
+                                                <Pencil className="w-3.5 h-3.5" />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="text-xs bg-[#172B4D] text-white border-none py-1.5 px-2">Edit</TooltipContent>
+                                    </Tooltip>
 
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[3px] hover:bg-[#FFEBE6] hover:text-[#BF2600] text-[#42526E]" onClick={() => onDelete(ticket)}>
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent className="text-xs bg-[#172B4D] text-white border-none py-1.5 px-2">Delete</TooltipContent>
-                            </Tooltip>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-[3px] hover:bg-[#FFEBE6] hover:text-[#BF2600] text-[#42526E]" onClick={() => onDelete(ticket)}>
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="text-xs bg-[#172B4D] text-white border-none py-1.5 px-2">Delete</TooltipContent>
+                                    </Tooltip>
 
-                            <div className="w-px h-4 bg-border/60 mx-1" />
+                                    <div className="w-px h-4 bg-border/60 mx-1" />
+                                </>
+                            )}
 
                             <Tooltip>
                                 <TooltipTrigger asChild>

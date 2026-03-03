@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { ProjectTabs } from "@/components/ProjectTabs";
-import { Pin, Trash2, Check, List, FileText, X, ChevronRight, Hash, Share2, Users, Shield, ShieldAlert, ShieldOff, CheckCircle2 } from "lucide-react";
+import { Pin, Trash2, Check, List, FileText, X, ChevronRight, Hash, Share2, Users, Shield, ShieldAlert, ShieldOff, CheckCircle2, Pencil } from "lucide-react";
 import { projectService, noteService, authService } from "@/services/authService";
 import { MemberSelector } from "@/components/MemberSelector";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { FormField } from "@/components/FormField";
 import { Switch } from "@/components/ui/switch";
 
@@ -69,6 +70,7 @@ const Notes = () => {
   const { toast } = useToast();
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelMode, setPanelMode] = useState<"create" | "edit">("create");
+  const [isEditing, setIsEditing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -130,6 +132,7 @@ const Notes = () => {
     setNewProjectId(note.projectId);
     setNewListItems(note.listItems || [{ id: "new1", text: "", checked: false }]);
     setPanelMode("edit");
+    setIsEditing(false); // Initially read-only
     setPanelOpen(true);
   };
 
@@ -179,6 +182,7 @@ const Notes = () => {
     setNewListItems([{ id: "new1", text: "", checked: false }]);
     setEditingId(null); // Fix: Reset editingId so auto-save works for the next new note
     setPanelMode("create");
+    setIsEditing(true); // Create mode should allow editing immediately
     setPanelOpen(true);
   };
 
@@ -232,6 +236,11 @@ const Notes = () => {
       // Update local state immediately with full populated object
       setNotes(prev => prev.map(n => n.id === editingId ? updatedNote : n));
 
+      // Fix: Keep activeNote in sync to prevent access control issues
+      if (activeNote?.id === editingId) {
+        setActiveNote(updatedNote);
+      }
+
       if (manual) {
         setPanelOpen(false);
         toast({ title: "Note Updated", variant: "success" });
@@ -278,7 +287,7 @@ const Notes = () => {
   const handleClosePanel = () => {
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
 
-    if (canEdit) {
+    if (canEdit && isEditing) {
       const isEmpty = !newTitle.trim() && (createType === "note" ? !newContent.trim() : !newListItems.filter(i => i.text.trim()).length);
 
       if (panelMode === "edit" && editingId) {
@@ -300,7 +309,7 @@ const Notes = () => {
 
   // Auto-save logic
   useEffect(() => {
-    if (!panelOpen || !canEdit) return;
+    if (!panelOpen || !canEdit || !isEditing) return;
 
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
 
@@ -331,6 +340,7 @@ const Notes = () => {
             setPanelMode("edit");
             const newNote = { ...createdNote, user: currentUser, canEdit: true };
             setNotes(prev => [newNote, ...prev]);
+            setActiveNote(newNote); // Fix: Set activeNote for the newly created note
             setTotalItems(prev => prev + 1);
           } catch (err) {
             console.error("Auto-create failed", err);
@@ -344,7 +354,7 @@ const Notes = () => {
     return () => {
       if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
     };
-  }, [newTitle, newContent, newListItems, newProjectId, panelOpen]);
+  }, [newTitle, newContent, newListItems, newProjectId, panelOpen, isEditing]);
 
   const togglePin = async (id: number) => {
     try {
@@ -376,8 +386,15 @@ const Notes = () => {
   };
 
   const isShared = activeNote && activeNote.userId !== currentUser?.id;
+
+  // Robust check for canEdit: either the flag is true, or the current user is the owner,
+  // or the current user is in the shares list with canEdit: true
   const canEdit = activeNote
-    ? (activeNote.userId === currentUser?.id || !!activeNote.canEdit)
+    ? (
+      activeNote.userId === currentUser?.id ||
+      !!activeNote.canEdit ||
+      activeNote.shares?.some((s: any) => s.sharedWithUser?.id === currentUser?.id && s.canEdit)
+    )
     : true;
 
   return (
@@ -512,7 +529,7 @@ const Notes = () => {
                   {/* Content */}
                   <div className="flex-1 overflow-hidden">
                     {note.type === "note" ? (
-                      <p className="text-[14px] text-[#42526E] line-clamp-5 leading-relaxed mb-4 italic opacity-90 break-words overflow-hidden">{note.content || "No content."}</p>
+                      <p className="text-[14px] text-[#42526E] line-clamp-5 leading-relaxed mb-4 opacity-90 break-words overflow-hidden">{note.content || "No content."}</p>
                     ) : (
                       <div className="space-y-2 mb-4">
                         {note.listItems?.slice(0, 4).map((item, idx) => (
@@ -523,7 +540,7 @@ const Notes = () => {
                             )}>
                               {item.checked && <Check className="w-2.5 h-2.5 text-white stroke-[4px]" />}
                             </div>
-                            <span className={cn("text-[13px] font-medium truncate", item.checked ? "line-through text-[#6B778C]/70 italic" : "text-[#172B4D]")}>{item.text}</span>
+                            <span className={cn("text-[13px] font-medium truncate", item.checked ? "line-through text-[#6B778C]/70" : "text-[#172B4D]")}>{item.text}</span>
                           </div>
                         ))}
                         {(note.listItems?.length || 0) > 4 && (
@@ -639,7 +656,7 @@ const Notes = () => {
                     animate={{ x: 0 }}
                     exit={{ x: "100%" }}
                     transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                    className="fixed top-0 right-0 z-[70] w-full max-w-3xl h-full bg-white border-l border-[#EBECF0] shadow-2xl flex flex-col font-sans"
+                    className="fixed top-0 right-0 z-[70] w-full max-w-[550px] h-full bg-white border-l border-[#EBECF0] shadow-2xl flex flex-col font-sans"
                   >
                     {/* Panel Toolbar */}
                     <div className="px-6 py-4 flex items-center justify-between bg-white border-b border-[#EBECF0] shrink-0">
@@ -658,11 +675,30 @@ const Notes = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
+                        {canEdit && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className={cn("h-8 w-8 rounded-[3px] transition-all", isEditing ? "text-[#0052CC] bg-[#DEEBFF]" : "text-[#42526E] hover:bg-[#EBECF0]")}
+                                  onClick={() => setIsEditing(!isEditing)}
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" className="text-xs bg-[#172B4D] text-white border-none py-1.5 px-2">
+                                {isEditing ? "Disable Editing" : "Enable Editing"}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                         {isSyncing ? (
                           <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#DEEBFF] text-[#0052CC] text-[10px] font-bold">
                             Saving...
                           </div>
-                        ) : panelMode === "edit" && (
+                        ) : (panelMode === "edit" && isEditing) && (
                           <div className="flex items-center gap-1.5 text-[#006644] text-[10px] font-bold">
                             <CheckCircle2 className="w-3.5 h-3.5" /> Saved
                           </div>
@@ -675,10 +711,24 @@ const Notes = () => {
 
                     <div className="flex-1 overflow-y-auto premium-scrollbar flex flex-col min-h-0 bg-white">
                       <div className="p-6 space-y-5">
+                        {!isEditing && (
+                          <div className="flex items-center gap-3 p-3 rounded-[3px] bg-[#F4F5F7] border border-[#EBECF0] text-[#172B4D]">
+                            <Shield className="w-3.5 h-3.5 text-[#6B778C]" />
+                            <span className="text-[12px] font-medium">Read-only mode. Click the pencil icon to edit.</span>
+                          </div>
+                        )}
+
+                        {canEdit && isEditing && (
+                          <div className="flex items-center gap-3 p-3 rounded-[3px] bg-[#E3FCEF]/50 border border-[#006644]/20 text-[#006644]">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span className="text-[12px] font-medium">Edit mode active. All changes are auto-saved.</span>
+                          </div>
+                        )}
+
                         {!canEdit && (
                           <div className="flex items-center gap-3 p-3 rounded-[3px] bg-[#FFF0B3]/50 border border-[#FFAB00]/20 text-[#172B4D]">
                             <ShieldAlert className="w-3.5 h-3.5 text-[#BF6000]" />
-                            <span className="text-[12px] font-medium">Read-only document.</span>
+                            <span className="text-[12px] font-medium">Read-only document (Shared).</span>
                           </div>
                         )}
 
@@ -691,7 +741,7 @@ const Notes = () => {
                               value={newProjectId?.toString() || ""}
                               onChange={v => setNewProjectId(v || null)}
                               placeholder="None"
-                              disabled={!canEdit}
+                              disabled={!canEdit || !isEditing}
                               size="sm"
                               triggerClassName="w-full h-9 rounded-[3px] border-[#EBECF0] bg-white hover:border-[#DFE1E6] text-[13px] font-medium text-[#172B4D] px-3.5 shadow-none transition-all focus:border-[#0052CC]"
                             />
@@ -706,8 +756,8 @@ const Notes = () => {
                               value={newTitle}
                               onChange={e => setNewTitle(e.target.value)}
                               placeholder={`Enter ${createType} title...`}
-                              disabled={!canEdit}
-                              className="w-full bg-white border border-[#EBECF0] rounded-[3px] px-3.5 py-3 text-[18px] font-bold focus:outline-none focus:border-[#0052CC] placeholder:text-[#C1C7D0] text-[#172B4D] disabled:opacity-50 transition-all shadow-none"
+                              disabled={!canEdit || !isEditing}
+                              className="w-full bg-white border border-[#EBECF0] rounded-[3px] px-3.5 py-3 text-[18px] font-bold focus:outline-none focus:border-[#0052CC] placeholder:text-[#C1C7D0] text-[#172B4D] disabled:opacity-70 transition-all shadow-none"
                               autoFocus
                             />
                           </div>
@@ -723,8 +773,8 @@ const Notes = () => {
                                   value={newContent}
                                   onChange={e => setNewContent(e.target.value)}
                                   placeholder="Start writing..."
-                                  disabled={!canEdit}
-                                  className="w-full flex-1 bg-transparent border-none p-3.5 text-[14px] focus:outline-none transition-all resize-none disabled:opacity-60 leading-relaxed font-normal text-[#172B4D] placeholder:text-[#C1C7D0]"
+                                  disabled={!canEdit || !isEditing}
+                                  className="w-full flex-1 bg-transparent border-none p-3.5 text-[14px] focus:outline-none transition-all resize-none disabled:opacity-80 leading-relaxed font-normal text-[#172B4D] placeholder:text-[#C1C7D0]"
                                 />
                               ) : (
                                 <div className="p-4 space-y-3">
@@ -732,7 +782,7 @@ const Notes = () => {
                                     <div key={idx} className="flex items-center gap-3 group/item border-b border-[#F4F5F7] pb-2 last:border-0 last:pb-0">
                                       <button
                                         type="button"
-                                        disabled={!canEdit}
+                                        disabled={!canEdit || !isEditing}
                                         onClick={() => {
                                           const updated = [...newListItems];
                                           updated[idx].checked = !updated[idx].checked;
@@ -747,7 +797,7 @@ const Notes = () => {
                                       </button>
                                       <input
                                         value={item.text}
-                                        disabled={!canEdit}
+                                        disabled={!canEdit || !isEditing}
                                         onKeyDown={(e) => {
                                           if (e.key === "Enter") {
                                             setNewListItems(prev => [...prev, { id: `new-${Date.now()}`, text: "", checked: false }]);
@@ -760,11 +810,11 @@ const Notes = () => {
                                         }}
                                         placeholder="Add task..."
                                         className={cn(
-                                          "flex-1 bg-transparent text-[14px] font-medium focus:outline-none disabled:opacity-50 transition-all text-[#172B4D]",
-                                          item.checked && "line-through text-[#6B778C]/70 italic"
+                                          "flex-1 bg-transparent text-[14px] font-medium focus:outline-none disabled:opacity-70 transition-all text-[#172B4D]",
+                                          item.checked && "line-through text-[#6B778C]/70"
                                         )}
                                       />
-                                      {canEdit && newListItems.length > 1 && (
+                                      {canEdit && isEditing && newListItems.length > 1 && (
                                         <button
                                           type="button"
                                           onClick={() => setNewListItems(prev => prev.filter((_, i) => i !== idx))}
@@ -775,7 +825,7 @@ const Notes = () => {
                                       )}
                                     </div>
                                   ))}
-                                  {canEdit && (
+                                  {canEdit && isEditing && (
                                     <button
                                       type="button"
                                       onClick={() => setNewListItems(prev => [...prev, { id: `new-${Date.now()}`, text: "", checked: false }])}

@@ -12,11 +12,11 @@ import { MemberBadges } from "@/components/MemberSelector";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
-import { projectService, authService } from "@/services/authService";
+import { projectService, invitationService, authService } from "@/services/authService";
 import { ProjectSidebarForm } from "@/components/ProjectSidebarForm";
 import { ProjectDetailView } from "@/components/ProjectDetailView";
 
-const CAN_MANAGE_PROJECTS = ['Architect', 'Manager', 'System Architect', 'Senior Developer', 'Technical Analyst'];
+const CAN_MANAGE_PROJECTS = ['Architect'];
 
 const PAGE_SIZE = 10;
 
@@ -26,6 +26,7 @@ interface Project {
   client: string;
   description: string;
   projectCode?: string;
+  createdBy?: number;
   members: any[];
 }
 
@@ -50,7 +51,7 @@ const Projects = () => {
   const { toast } = useToast();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const currentUser = authService.getCurrentUser();
-  const canManage = CAN_MANAGE_PROJECTS.includes(currentUser?.role || '');
+  const isArchitect = currentUser?.role === 'Architect';
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -67,7 +68,7 @@ const Projects = () => {
       setProjects(response.data);
       setPagination(response.pagination);
 
-      // If no projects found and no search is active, go to welcome
+      // Only redirect to welcome if truly no projects exist at all (not during a search)
       if (response.data.length === 0 && !search && page === 1) {
         navigate("/welcome", { replace: true });
       }
@@ -85,6 +86,13 @@ const Projects = () => {
       openCreate();
     }
   }, [search, page, isFirstTime]);
+
+  // Listen for the custom event fired by HeaderNav when an invitation is accepted
+  useEffect(() => {
+    const handleRefresh = () => fetchProjects();
+    window.addEventListener('projects:refresh', handleRefresh);
+    return () => window.removeEventListener('projects:refresh', handleRefresh);
+  }, [search, page]);
 
   useEffect(() => {
     if (descriptionTarget) {
@@ -129,21 +137,42 @@ const Projects = () => {
     const startTime = Date.now();
     setIsSaving(true);
     try {
-      const payload = {
-        ...editData,
-        members: editData.members?.map((m: any) => typeof m === 'object' ? m.id : m)
-      };
+      const memberIds: number[] = editData.members?.map((m: any) => typeof m === 'object' ? m.id : m) || [];
 
       if (editingId) {
-        const updatedProject = await projectService.update(editingId, payload);
-        toast({ title: "Project Updated", description: `${editData.name} has been updated successfully.`, variant: "success" });
+        // On EDIT:
+        // - Members removed from list → removed immediately from project
+        // - Members already in project → kept
+        // - Newly added members → sent an invitation (must accept to join)
+        const existingProject = projects.find(p => p.id === editingId);
+        const existingMemberIds: number[] = existingProject?.members?.map((m: any) => m.id) || [];
 
-        // If we are currently viewing this project in the details drawer, update it immediately
+        // Which current members are kept (still in selector)
+        const retainedIds = existingMemberIds.filter(id => memberIds.includes(id));
+        // Which are brand new (not yet a member)
+        const newlyAddedIds = memberIds.filter(id => !existingMemberIds.includes(id));
+
+        // Update project info + apply removals (pass only retained members)
+        const updatedProject = await projectService.update(editingId, {
+          ...editData,
+          members: retainedIds
+        });
+
+        // Send invitations for newly added users only
+        if (newlyAddedIds.length > 0) {
+          await projectService.invite(editingId, newlyAddedIds);
+          toast({ title: "Invitations Sent ✉️", description: `${newlyAddedIds.length} invitation(s) sent. They will join once they accept.`, variant: "success" });
+        } else {
+          toast({ title: "Project Updated", description: `${editData.name} has been updated successfully.`, variant: "success" });
+        }
+
         if (descriptionTarget?.id === editingId) {
           setDescriptionTarget(updatedProject);
         }
+        setProjects(prev => prev.map(p => p.id === editingId ? updatedProject : p));
       } else {
-        await projectService.create(payload);
+        // On CREATE: directly add members (no invite needed for initial team)
+        await projectService.create({ ...editData, members: memberIds });
         toast({ title: "Project Created", description: `${editData.name} has been created successfully.`, variant: "success" });
 
         if (projects.length === 0) {
@@ -193,15 +222,13 @@ const Projects = () => {
               />
             </div>
             <div className="flex items-center gap-3">
-              {canManage && (
-                <Button
-                  onClick={openCreate}
-                  className="gap-2 rounded-[3px] px-4 h-9 shrink-0 bg-[#0052CC] hover:bg-[#0747A6] text-white border-none transition-all font-bold text-[14px]"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Create Project</span>
-                </Button>
-              )}
+              <Button
+                onClick={openCreate}
+                className="gap-2 rounded-[3px] px-4 h-9 shrink-0 bg-[#0052CC] hover:bg-[#0747A6] text-white border-none transition-all font-bold text-[14px]"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Create Project</span>
+              </Button>
             </div>
           </div>
 
@@ -211,6 +238,28 @@ const Projects = () => {
                 <div key={i} className="h-44 bg-[#F4F5F7] rounded-[3px] border border-border" />
               ))}
             </div>
+          ) : projects.length === 0 && search ? (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col items-center justify-center py-24 gap-5"
+            >
+              <div className="w-16 h-16 rounded-[6px] bg-[#F4F5F7] border border-border flex items-center justify-center">
+                <FolderKanban className="w-8 h-8 text-[#6B778C]" />
+              </div>
+              <div className="text-center space-y-1.5">
+                <h3 className="text-[16px] font-bold text-[#172B4D]">No projects found</h3>
+                <p className="text-[13px] text-[#6B778C] font-medium">
+                  No results for <span className="font-bold text-[#42526E]">&ldquo;{search}&rdquo;</span>. Try a different search term.
+                </p>
+              </div>
+              <Button
+                onClick={() => { setSearch(""); setPage(1); }}
+                className="rounded-[3px] h-9 px-4 bg-white border border-border text-[#42526E] hover:bg-[#F4F5F7] shadow-none font-bold text-[13px]"
+              >
+                Clear search
+              </Button>
+            </motion.div>
           ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -243,7 +292,7 @@ const Projects = () => {
                           </div>
                         </div>
 
-                        <p className="text-[14px] text-[#42526E] line-clamp-2 min-h-[2.5rem] leading-relaxed italic opacity-80">
+                        <p className="text-[14px] text-[#42526E] line-clamp-2 min-h-[2.5rem] leading-relaxed opacity-80">
                           {project.description || "No description provided."}
                         </p>
                       </div>
@@ -305,22 +354,27 @@ const Projects = () => {
           </AnimatePresence>
 
           <AnimatePresence mode="popLayout">
-            {dialogOpen && (
-              <ProjectSidebarForm
-                key="project-form"
-                open={dialogOpen}
-                onClose={() => setDialogOpen(false)}
-                title={editingId ? "Edit Project" : "Create Project"}
-                subtitle={editingId ? "Modify project information" : "Start a new collaboration space"}
-                onSave={handleSave}
-                editData={editData}
-                setEditData={setEditData}
-                errors={errors}
-                setErrors={setErrors}
-                isEditing={!!editingId}
-                isSaving={isSaving}
-              />
-            )}
+            {dialogOpen && (() => {
+              const editingProject = editingId ? projects.find(p => p.id === editingId) : null;
+              const isCreator = !editingId || editingProject?.createdBy === currentUser?.id || isArchitect;
+              return (
+                <ProjectSidebarForm
+                  key="project-form"
+                  open={dialogOpen}
+                  onClose={() => setDialogOpen(false)}
+                  title={editingId ? "Edit Project" : "Create Project"}
+                  subtitle={editingId ? "Modify project information" : "Start a new collaboration space"}
+                  onSave={handleSave}
+                  editData={editData}
+                  setEditData={setEditData}
+                  errors={errors}
+                  setErrors={setErrors}
+                  isEditing={!!editingId}
+                  isSaving={isSaving}
+                  isCreator={isCreator}
+                />
+              );
+            })()}
           </AnimatePresence>
 
           <DeleteDialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} itemName={deleteTarget?.name || "project"} loading={isDeleting} />

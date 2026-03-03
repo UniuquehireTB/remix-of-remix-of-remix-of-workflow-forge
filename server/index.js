@@ -11,6 +11,7 @@ const ticketRoutes = require('./routes/ticketRoutes');
 const noteRoutes = require('./routes/noteRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const commentRoutes = require('./routes/commentRoutes');
+const invitationRoutes = require('./routes/invitationRoutes');
 
 const app = express();
 
@@ -71,6 +72,7 @@ app.use('/api/tickets', ticketRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/comments', commentRoutes);
+app.use('/api/invitations', invitationRoutes);
 
 // Local dev server startup
 const PORT = process.env.PORT || 5000;

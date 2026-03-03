@@ -9,24 +9,33 @@ const getAllProjects = async (req, res) => {
 
         const whereClause = {
             isActive: true,
-            ...(search && {
+        };
+
+        // Search filter
+        if (search) {
+            whereClause[Op.and] = whereClause[Op.and] || [];
+            whereClause[Op.and].push({
                 [Op.or]: [
                     { name: { [Op.iLike]: `%${search}%` } },
                     { client: { [Op.iLike]: `%${search}%` } }
                 ]
-            })
-        };
-
-        // Role-based filtering
-        // If not Architect, only show projects where the user is a member
-        if (req.user.role !== 'Architect') {
-            const userProjectIds = await ProjectMember.findAll({
-                where: { userId: req.user.id },
-                attributes: ['projectId']
             });
-            const projectIds = userProjectIds.map(pm => pm.projectId);
-            whereClause.id = { [Op.in]: projectIds };
         }
+
+        // Universal rule for ALL roles — show only projects where:
+        // the user is a ProjectMember  OR  the user is the creator
+        const userProjectIds = await ProjectMember.findAll({
+            where: { userId: req.user.id },
+            attributes: ['projectId']
+        });
+        const memberProjectIds = userProjectIds.map(pm => pm.projectId);
+        whereClause[Op.and] = whereClause[Op.and] || [];
+        whereClause[Op.and].push({
+            [Op.or]: [
+                { id: { [Op.in]: memberProjectIds } },
+                { createdBy: req.user.id }
+            ]
+        });
 
         const { count, rows } = await Project.findAndCountAll({
             where: whereClause,
@@ -104,15 +113,21 @@ const createProject = async (req, res) => {
             modifiedBy: req.user.id
         });
 
-        if (members && Array.isArray(members)) {
-            const memberAssociations = members.map(userId => ({
-                projectId: project.id,
-                userId: userId
-            }));
-            await ProjectMember.bulkCreate(memberAssociations);
+        // Ensure the creator is always included in the members list
+        const membersList = Array.isArray(members) ? [...members] : [];
+        if (!membersList.includes(req.user.id)) {
+            membersList.push(req.user.id);
+        }
 
-            // Notify Members
-            for (const userId of members) {
+        const memberAssociations = membersList.map(userId => ({
+            projectId: project.id,
+            userId: userId
+        }));
+        await ProjectMember.bulkCreate(memberAssociations);
+
+        // Notify Members (skip notifying the creator themselves)
+        for (const userId of membersList) {
+            if (userId !== req.user.id) {
                 await createNotification({
                     userId,
                     senderId: req.user.id,
@@ -154,18 +169,22 @@ const updateProject = async (req, res) => {
         });
 
         // Sync members: Remove all old members and add the new list
-        if (members && Array.isArray(members)) {
-            // Get current members to notify only new ones (optional, user said "update also")
-            // Let's just notify all in the new list for simplicity as per request
-            await ProjectMember.destroy({ where: { projectId: id } });
+        // Always ensure the original creator remains a member
+        const membersList = Array.isArray(members) ? [...members] : [];
+        if (project.createdBy && !membersList.includes(project.createdBy)) {
+            membersList.push(project.createdBy);
+        }
 
-            const memberAssociations = members.map(userId => ({
-                projectId: id,
-                userId: userId
-            }));
-            await ProjectMember.bulkCreate(memberAssociations);
+        await ProjectMember.destroy({ where: { projectId: id } });
 
-            for (const userId of members) {
+        const memberAssociations = membersList.map(userId => ({
+            projectId: id,
+            userId: userId
+        }));
+        await ProjectMember.bulkCreate(memberAssociations);
+
+        for (const userId of membersList) {
+            if (userId !== req.user.id) {
                 await createNotification({
                     userId,
                     senderId: req.user.id,
