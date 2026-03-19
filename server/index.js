@@ -12,6 +12,7 @@ const noteRoutes = require('./routes/noteRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const commentRoutes = require('./routes/commentRoutes');
 const invitationRoutes = require('./routes/invitationRoutes');
+const sheetRoutes = require('./routes/sheetRoutes');
 
 const app = express();
 
@@ -73,6 +74,7 @@ app.use('/api/notes', noteRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/invitations', invitationRoutes);
+app.use('/api/sheets', sheetRoutes);
 
 // Local dev server startup
 const PORT = process.env.PORT || 5000;

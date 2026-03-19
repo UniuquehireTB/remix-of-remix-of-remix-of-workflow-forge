@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
-import { Bell, User, Moon, Sun, LogOut, FolderKanban, Bug, FileText, X, Rocket, UserPlus, Mail, Lock, Eye, EyeOff, Shield, ArrowRight, Pencil, ChevronLeft, Users, ExternalLink, MoreHorizontal, LifeBuoy, Check } from "lucide-react";
+import { Bell, User, Moon, Sun, LogOut, FolderKanban, Bug, FileText, X, Rocket, UserPlus, Mail, Lock, Eye, EyeOff, Shield, ArrowRight, Pencil, ChevronLeft, Users, ExternalLink, MoreHorizontal, LifeBuoy, Check, Table } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -15,6 +15,7 @@ const navItems = [
   { title: "Projects", url: "/projects", icon: FolderKanban },
   { title: "Tickets", url: "/tickets", icon: Bug },
   { title: "Notes", url: "/notes", icon: FileText },
+  { title: "Sheet", url: "/sheet", icon: Table },
 ];
 
 interface NotificationData {
@@ -261,6 +262,7 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
     if (t?.includes('project')) return '/projects';
     if (t?.includes('ticket')) return '/tickets';
     if (t?.includes('note')) return '/notes';
+    if (t?.includes('sheet')) return '/sheet';
     return null;
   };
 
@@ -278,7 +280,8 @@ export function HeaderNav({ hideLinks = false }: { hideLinks?: boolean }) {
     const route = getNotificationRoute(n.type);
     if (route) {
       setNotifOpen(false);
-      const url = n.targetId ? `${route}?ticketId=${n.targetId}` : route;
+      const paramName = n.type === 'sheet' ? 'sheetId' : 'ticketId';
+      const url = n.targetId ? `${route}?${paramName}=${n.targetId}` : route;
       navigate(url);
     }
   };

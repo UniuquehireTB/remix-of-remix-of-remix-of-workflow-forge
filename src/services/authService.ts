@@ -268,3 +268,40 @@ export const notificationService = {
         return apiService.delete(`/notifications/${id}`);
     }
 };
+
+export const sheetService = {
+  // Get all sheets
+  getAll: async () => {
+    const response = await apiService.get('/sheets');
+    return response;
+  },
+  
+  // Get single sheet
+  getById: async (id: string | number) => {
+    const response = await apiService.get(`/sheets/${id}`);
+    return response;
+  },
+
+  // Create new sheet
+  create: async (data: { name: string; data?: any }) => {
+    const response = await apiService.post('/sheets', data);
+    return response;
+  },
+
+  // Save/Update sheet
+  update: async (id: string | number, data: { name?: string; data?: any }) => {
+    const response = await apiService.put(`/sheets/${id}`, data);
+    return response;
+  },
+
+  // Delete sheet
+  delete: async (id: string | number) => {
+    const response = await apiService.delete(`/sheets/${id}`);
+    return response;
+  },
+
+  // Share sheet
+  share: async (id: string | number, shares: { userId: number, canEdit: boolean }[]) => {
+    return apiService.post(`/sheets/${id}/share`, { shares });
+  }
+};

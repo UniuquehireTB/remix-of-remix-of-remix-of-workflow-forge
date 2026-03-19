@@ -9,6 +9,7 @@ import Notes from "./pages/Notes";
 import Login from "./pages/Login";
 import Welcome from "./pages/Welcome";
 import NotFound from "./pages/NotFound";
+import SheetPage from "./pages/SheetPage";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AutoLogoutProvider } from "./components/AutoLogoutProvider";
@@ -36,6 +37,7 @@ const App = () => (
                 <Route path="/projects" element={<Projects />} />
                 <Route path="/tickets" element={<Tickets />} />
                 <Route path="/notes" element={<Notes />} />
+                <Route path="/sheet" element={<SheetPage />} />
                 <Route path="/welcome" element={<Welcome />} />
               </Route>
 

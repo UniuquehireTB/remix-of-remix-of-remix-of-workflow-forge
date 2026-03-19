@@ -8,6 +8,8 @@ const Note = require('./Note');
 const NoteShare = require('./NoteShare');
 const Notification = require('./Notification');
 const Comment = require('./Comment');
+const Sheet = require('./Sheet');
+const SheetShare = require('./SheetShare');
 
 // Project <-> User (Members)
 Project.belongsToMany(User, { through: ProjectMember, as: 'members', foreignKey: 'projectId' });
@@ -68,6 +70,17 @@ Comment.belongsTo(Ticket, { foreignKey: 'ticketId', as: 'ticket' });
 User.hasMany(Comment, { foreignKey: 'userId', as: 'comments' });
 Comment.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
+// User <-> Sheet
+User.hasMany(Sheet, { foreignKey: 'userId', as: 'sheets' });
+Sheet.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+// Sheet <-> SheetShare
+Sheet.hasMany(SheetShare, { foreignKey: 'sheetId', as: 'shares' });
+SheetShare.belongsTo(Sheet, { foreignKey: 'sheetId' });
+
+User.hasMany(SheetShare, { foreignKey: 'sharedWithUserId', as: 'receivedSheets' });
+SheetShare.belongsTo(User, { foreignKey: 'sharedWithUserId', as: 'sharedWithUser' });
+
 module.exports = {
     User,
     Project,
@@ -78,5 +91,7 @@ module.exports = {
     Note,
     NoteShare,
     Notification,
-    Comment
+    Comment,
+    Sheet,
+    SheetShare
 };
