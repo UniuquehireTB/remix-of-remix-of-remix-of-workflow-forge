@@ -6,9 +6,10 @@ import { Sheet as ShadcnSheet, SheetContent, SheetHeader, SheetTitle, SheetTrigg
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import { Table, Database, CheckSquare, Loader2, Plus, ChevronDown, Trash2, Settings, FileText, Edit2, LayoutGrid, PlusCircle, AlertCircle, Share2, User, UserPlus, Shield, ShieldCheck, Mail, Users } from "lucide-react";
+import { Table, Database, CheckSquare, Loader2, Plus, ChevronDown, Trash2, Settings, FileText, Edit2, LayoutGrid, PlusCircle, AlertCircle, Share2, User, UserPlus, Shield, ShieldCheck, Mail, Users, Calendar } from "lucide-react";
 import { sheetService, authService } from "@/services/authService";
 import { AnimatedDropdown } from "@/components/AnimatedDropdown";
+import { AnimatedDatePicker } from "@/components/AnimatedDatePicker";
 import { MemberSelector } from "@/components/MemberSelector";
 import { CrudDialog } from "@/components/CrudDialog";
 import { type ClassValue, clsx } from "clsx";
@@ -20,8 +21,8 @@ function cn(...inputs: ClassValue[]) {
 
 export type ColumnType = 'text' | 'dropdown' | 'date';
 export interface ColumnOption { id: string; label: string; color: string; }
-export interface ColumnDef { id: string; name: string; type: ColumnType; options?: ColumnOption[]; }
-export interface RowDef { id: string; cells: { [columnId: string]: string }; }
+export interface ColumnDef { id: string; name: string; type: ColumnType; options?: ColumnOption[]; width?: number; }
+export interface RowDef { id: string; cells: { [columnId: string]: string }; height?: number; }
 export interface GridSchema { columns: ColumnDef[]; rows: RowDef[]; }
 export interface SheetMetadata { id: number; name: string; updatedAt: string; userId?: number; user?: { username: string; email: string }; }
 
@@ -95,6 +96,7 @@ export default function SheetPage() {
   const { toast } = useToast();
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentUser = authService.getCurrentUser();
+
 
   // Handle Deep Linking
   useEffect(() => {
@@ -274,7 +276,103 @@ export default function SheetPage() {
     saveTimeoutRef.current = setTimeout(() => saveToAPI(newData), 1500);
   };
 
+  // Resizing State
+  const [resizingCol, setResizingCol] = useState<{ id: string, startX: number, startWidth: number } | null>(null);
+  const [resizingRow, setResizingRow] = useState<{ id: string, startY: number, startHeight: number } | null>(null);
+
+  // Resizing Handlers
+  const handleMouseDownCol = (e: React.MouseEvent, colId: string, currentWidth: number) => {
+    if (!activeSheetMeta?.canEdit) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setResizingCol({ id: colId, startX: e.clientX, startWidth: currentWidth });
+  };
+
+  const handleMouseDownRow = (e: React.MouseEvent, rowId: string, currentHeight: number) => {
+    if (!activeSheetMeta?.canEdit) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setResizingRow({ id: rowId, startY: e.clientY, startHeight: currentHeight });
+  };
+
+  const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
+    if (resizingCol) {
+      const deltaX = e.clientX - resizingCol.startX;
+      const newWidth = Math.max(50, resizingCol.startWidth + deltaX);
+      const newCols = data.columns.map(c => c.id === resizingCol.id ? { ...c, width: newWidth } : c);
+      setData(prev => ({ ...prev, columns: newCols }));
+    } else if (resizingRow) {
+      const deltaY = e.clientY - resizingRow.startY;
+      const newHeight = Math.max(30, resizingRow.startHeight + deltaY);
+      const newRows = data.rows.map(r => r.id === resizingRow.id ? { ...r, height: newHeight } : r);
+      setData(prev => ({ ...prev, rows: newRows }));
+    }
+  }, [resizingCol, resizingRow, data]);
+
+  const handleGlobalMouseUp = useCallback(() => {
+    if (resizingCol || resizingRow) {
+      setResizingCol(null);
+      setResizingRow(null);
+      handleUpdateGrid(data);
+    }
+  }, [resizingCol, resizingRow, data, handleUpdateGrid]);
+
+  useEffect(() => {
+    if (resizingCol || resizingRow) {
+      window.addEventListener('mousemove', handleGlobalMouseMove);
+      window.addEventListener('mouseup', handleGlobalMouseUp);
+    } else {
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [resizingCol, resizingRow, handleGlobalMouseMove, handleGlobalMouseUp]);
+
   // --- Row Logic ---
+  const handleSheetKeyDown = (e: React.KeyboardEvent) => {
+    const target = e.target as HTMLElement;
+    const isTextarea = target.tagName === 'TEXTAREA';
+    const cellWrapper = target.closest('[data-row]') as HTMLElement;
+    
+    if (!cellWrapper) return;
+
+    const row = parseInt(cellWrapper.getAttribute('data-row') || '0');
+    const col = parseInt(cellWrapper.getAttribute('data-col') || '0');
+
+    let nextRow = row;
+    let nextCol = col;
+
+    if (e.key === 'ArrowUp') {
+       nextRow--;
+    } else if (e.key === 'ArrowDown') {
+       nextRow++;
+    } else if (e.key === 'ArrowLeft') {
+       if (isTextarea) {
+         const ta = target as HTMLTextAreaElement;
+         if (ta.selectionStart !== 0) return;
+       }
+       nextCol--;
+    } else if (e.key === 'ArrowRight') {
+       if (isTextarea) {
+         const ta = target as HTMLTextAreaElement;
+         if (ta.selectionEnd !== ta.value.length) return;
+       }
+       nextCol++;
+    } else {
+       return;
+    }
+
+    const nextEl = document.querySelector(`[data-row="${nextRow}"][data-col="${nextCol}"]`) as HTMLElement;
+    if (nextEl) {
+      e.preventDefault();
+      const focusable = nextEl.classList.contains('sheet-cell-input') ? nextEl : nextEl.querySelector('.sheet-cell-input') as HTMLElement;
+      focusable?.focus();
+    }
+  };
+
   const updateCell = (rowId: string, colId: string, value: string) => {
     const newRows = data.rows.map(row => 
       row.id === rowId ? { ...row, cells: { ...row.cells, [colId]: value } } : row
@@ -588,12 +686,24 @@ export default function SheetPage() {
                     <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 shadow-sm">
                       <th className="font-medium py-3 px-3 border-r border-slate-200 w-12 text-center text-[10px] uppercase tracking-wider text-slate-400 bg-slate-50">#</th>
                       
-                      {data.columns.map((col, index) => (
-                        <th key={col.id} className="font-bold py-3 px-3 border-r border-slate-200 group hover:bg-slate-100 cursor-pointer w-[180px] text-[11px] uppercase tracking-wider bg-slate-50 text-slate-700" onClick={() => openEditColumnModal(col)}>
+                      {data.columns.map((col, colIndex) => (
+                        <th 
+                          key={col.id} 
+                          className="font-bold py-3 px-3 border-r border-slate-200 group hover:bg-slate-100 cursor-pointer text-[11px] uppercase tracking-wider bg-slate-50 text-slate-700 relative" 
+                          style={{ width: col.width || 180, minWidth: col.width || 180 }}
+                          onClick={() => openEditColumnModal(col)}
+                        >
                           <div className="flex items-center justify-between">
-                            <span>{col.name}</span>
+                            <span className="truncate">{col.name}</span>
                             {activeSheetMeta?.canEdit && <Settings className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400" />}
                           </div>
+                          {activeSheetMeta?.canEdit && (
+                            <div 
+                              className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue-400 active:bg-blue-600 transition-colors z-30"
+                              onMouseDown={(e) => handleMouseDownCol(e, col.id, col.width || 180)}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          )}
                         </th>
                       ))}
                       
@@ -607,37 +717,67 @@ export default function SheetPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-100 h-max bg-white">
                     {data.rows.map((row, index) => (
-                      <tr key={row.id} className="hover:bg-blue-50/20 transition-colors group">
+                      <tr 
+                        key={row.id} 
+                        className="hover:bg-blue-50/20 transition-colors group"
+                        style={{ height: row.height || 'auto' }}
+                      >
                         <td className="py-1 px-3 border-r border-slate-100 text-center relative group-hover:bg-slate-100 transition-colors">
                            <span className="text-slate-300 font-mono text-[10px] group-hover:opacity-0 transition-opacity">{index + 1}</span>
                            {activeSheetMeta?.canEdit && (
-                             <button 
-                               onClick={(e) => { e.stopPropagation(); deleteRow(row.id); }}
-                               className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-all scale-90 group-hover:scale-100"
-                               title="Delete Row"
-                             >
-                               <Trash2 className="w-3.5 h-3.5" />
-                             </button>
+                             <>
+                               <button 
+                                 onClick={(e) => { e.stopPropagation(); deleteRow(row.id); }}
+                                 className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-all scale-90 group-hover:scale-100"
+                                 title="Delete Row"
+                               >
+                                 <Trash2 className="w-3.5 h-3.5" />
+                               </button>
+                               <div 
+                                 className="absolute bottom-0 left-0 w-full h-1 cursor-row-resize hover:bg-blue-400 active:bg-blue-600 transition-colors z-30"
+                                 onMouseDown={(e) => handleMouseDownRow(e, row.id, row.height || 40)}
+                               />
+                             </>
                            )}
                         </td>
                         
-                        {data.columns.map(col => (
-                          <td key={col.id} className="py-1 px-3 border-r border-slate-100">
-                            
-                            {col.type === 'text' || col.type === 'date' ? (
-                              <input 
-                                type="text" 
+                        {data.columns.map((col, colIndex) => (
+                          <td 
+                            key={col.id} 
+                            className="px-3 border-r border-slate-100 align-top py-2"
+                            style={{ width: col.width || 180, minWidth: col.width || 180 }}
+                          >
+                            {col.type === 'text' ? (
+                              <AutoResizeTextarea 
                                 value={row.cells[col.id] || ''}
-                                onChange={(e) => updateCell(row.id, col.id, e.target.value)}
+                                onChange={(val: string) => updateCell(row.id, col.id, val)}
                                 disabled={!activeSheetMeta?.canEdit}
+                                data-row={index}
+                                data-col={colIndex}
+                                onKeyDown={handleSheetKeyDown}
                                 className={cn(
-                                  "w-full bg-transparent border-transparent hover:border-slate-200 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 rounded px-2 py-1.5 text-sm transition-all text-slate-800 font-medium",
-                                  !activeSheetMeta?.canEdit && "cursor-default hover:border-transparent opacity-90"
+                                  "w-full bg-transparent border-transparent hover:border-slate-200 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 rounded px-2 py-1 text-sm transition-all text-slate-800 font-medium resize-none overflow-hidden block min-h-[30px] leading-relaxed",
+                                  !activeSheetMeta?.canEdit && "cursor-default hover:border-transparent opacity-90",
+                                  "sheet-cell-input"
                                 )}
-                                placeholder={col.type === 'date' ? 'MM/DD/YYYY' : '...'}
+                                placeholder="..."
+                              />
+                             ) : col.type === 'date' ? (
+                              <SheetDatePicker 
+                                value={row.cells[col.id] || ''}
+                                onChange={(val: string) => updateCell(row.id, col.id, val)}
+                                disabled={!activeSheetMeta?.canEdit}
+                                data-row={index}
+                                data-col={colIndex}
+                                onKeyDown={handleSheetKeyDown}
                               />
                              ) : col.type === 'dropdown' ? (
-                              <div className="relative inline-block w-full">
+                              <div 
+                                className="relative inline-block w-full" 
+                                data-row={index} 
+                                data-col={colIndex}
+                                onKeyDown={handleSheetKeyDown}
+                              >
                                 <AnimatedDropdown
                                   size="sm"
                                   options={col.options?.map(opt => ({ label: opt.label, value: opt.label })) || []}
@@ -646,7 +786,7 @@ export default function SheetPage() {
                                   placeholder="Select..."
                                   disabled={!activeSheetMeta?.canEdit}
                                   triggerClassName={cn(
-                                    "h-7 !px-3 font-semibold text-[11px] rounded-full border border-transparent shadow-none transition-all",
+                                    "h-7 !px-3 font-semibold text-[11px] rounded-full border border-transparent shadow-none transition-all sheet-cell-input",
                                     getOptionColor(col.id, row.cells[col.id]) ? getOptionColor(col.id, row.cells[col.id]) : 'bg-slate-100 text-slate-700 hover:bg-slate-200',
                                     !activeSheetMeta?.canEdit && "opacity-80"
                                   )}
@@ -897,6 +1037,151 @@ export default function SheetPage() {
 
       </div>
     </AppLayout>
+  );
+}
+
+function AutoResizeTextarea({ value, onChange, disabled, className, placeholder, ...props }: any) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const adjustHeight = useCallback(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+    }
+  }, []);
+
+  useEffect(() => {
+    adjustHeight();
+  }, [value, adjustHeight]);
+
+  // Adjust on window resize and container resize (for column width changes)
+  useEffect(() => {
+    if (!textareaRef.current) return;
+    const observer = new ResizeObserver(() => {
+      adjustHeight();
+    });
+    observer.observe(textareaRef.current);
+    return () => observer.disconnect();
+  }, [adjustHeight]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      e.currentTarget.blur();
+      return;
+    }
+    props.onKeyDown?.(e);
+  };
+
+  return (
+    <textarea
+      ref={textareaRef}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
+      className={className}
+      placeholder={placeholder}
+      rows={1}
+      onKeyDown={handleKeyDown}
+      {...props}
+    />
+  );
+}
+
+function SheetDatePicker({ value, onChange, disabled, "data-row": row, "data-col": col, onKeyDown }: any) {
+  const toPickerDate = (val: string) => {
+    if (!val) return "";
+    const parts = val.split('/');
+    if (parts.length === 3) {
+      const [m, d, y] = parts;
+      if (y.length === 4) return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+    return val;
+  };
+
+  const fromPickerDate = (val: string) => {
+    if (!val) return "";
+    const parts = val.split('-');
+    if (parts.length === 3) {
+      const [y, m, d] = parts;
+      return `${m.padStart(2, '0')}/${d.padStart(2, '0')}/${y}`;
+    }
+    return val;
+  };
+
+  const handleInputChange = (val: string) => {
+    // Detect if user is deleting
+    const isDeleting = val.length < value.length;
+    
+    // Only allow digits and slashes
+    let sanitized = val.replace(/[^\d/]/g, '');
+    
+    // Auto-insert slashes only when typing forwards
+    if (!isDeleting) {
+      if (sanitized.length === 2 && !sanitized.includes('/')) {
+        const m = parseInt(sanitized);
+        if (m > 12) sanitized = '12/';
+        else if (m > 0) sanitized = sanitized + '/';
+      } else if (sanitized.length === 5 && sanitized.split('/').length === 2) {
+        const parts = sanitized.split('/');
+        const d = parseInt(parts[1]);
+        if (d > 31) sanitized = parts[0] + '/31/';
+        else if (d > 0) sanitized = sanitized + '/';
+      }
+    }
+
+    // Individual part validation
+    const parts = sanitized.split('/');
+    if (parts[0] && parts[0].length === 2) {
+      const m = parseInt(parts[0]);
+      if (m > 12) parts[0] = '12';
+      if (m === 0) parts[0] = '01';
+    }
+    if (parts[1] && parts[1].length === 2) {
+      const d = parseInt(parts[1]);
+      if (d > 31) parts[1] = '31';
+      if (d === 0) parts[1] = '01';
+    }
+    if (parts[2] && parts[2].length > 4) {
+      parts[2] = parts[2].substring(0, 4);
+    }
+    
+    sanitized = parts.join('/');
+
+    // Overall length limit 10 (MM/DD/YYYY)
+    if (sanitized.length <= 10) {
+      onChange(sanitized);
+    }
+  };
+
+  return (
+    <div className="relative flex items-center group/date w-full" data-row={row} data-col={col}>
+      <AutoResizeTextarea 
+        value={value}
+        onChange={handleInputChange}
+        disabled={disabled}
+        data-row={row}
+        data-col={col}
+        onKeyDown={onKeyDown}
+        className={cn(
+          "w-full bg-transparent border-transparent hover:border-slate-200 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 rounded px-2 py-1 text-sm transition-all text-slate-800 font-medium resize-none overflow-hidden block min-h-[30px] leading-relaxed pr-8",
+          disabled && "cursor-default hover:border-transparent opacity-90",
+          "sheet-cell-input"
+        )}
+        placeholder="MM/DD/YYYY"
+      />
+      {!disabled && (
+        <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/date:opacity-100 focus-within:opacity-100 transition-opacity">
+          <AnimatedDatePicker 
+            value={toPickerDate(value)} 
+            onChange={(val: string) => onChange(fromPickerDate(val))}
+            triggerClassName="p-1 hover:bg-slate-100 rounded-md transition-colors"
+          >
+            <Calendar className="w-3.5 h-3.5 text-slate-400 hover:text-blue-500 cursor-pointer" />
+          </AnimatedDatePicker>
+        </div>
+      )}
+    </div>
   );
 }
 
